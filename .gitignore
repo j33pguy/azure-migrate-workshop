@@ -1,0 +1,15 @@
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+
+# PowerShell temp
+*.tmp
+*.log
+
+# Azure credentials - never commit
+*.publishsettings
