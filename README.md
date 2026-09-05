@@ -53,7 +53,13 @@ The sites and Node API are independent samples. The IIS page is static; Nginx is
 ## Start here
 
 1. Read [Module 0](docs/Module-0-Setup.md), including subscription, quota, licensing, downloads and cost preparation.
-2. Obtain this repository from the instructor. The reviewed source is [Pamir/azure-migrate-workshop](https://github.com/Pamir/azure-migrate-workshop); see [fork and branding instructions](docs/Branding-and-Forking.md) for publication of this refreshed version.
+2. Obtain the reviewed version from [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop/tree/codex/hyperv-workshop-refresh). While the refresh is in draft review, use the branch below; the fork's `main` branch still contains the original workshop. Run these commands in a terminal, then continue from the repository directory:
+
+   ```bash
+   git clone --branch codex/hyperv-workshop-refresh https://github.com/j33pguy/azure-migrate-workshop.git
+   cd azure-migrate-workshop
+   ```
+
 3. In a PowerShell session with the current Az modules, choose your dedicated subscription and variables:
 
 ```powershell
