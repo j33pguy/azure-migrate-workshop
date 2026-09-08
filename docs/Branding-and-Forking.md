@@ -2,7 +2,7 @@
 
 **TD SYNNEX | Cloud Enablement Services**
 
-The draft uses TD SYNNEX text branding in the README, learner modules, instructor guide, guide scripts and sample HTML/API pages. No official logo artwork or unprovided brand colors have been invented. Apply the team's approved logo/assets when supplied.
+The workshop uses TD SYNNEX text branding in the README, learner modules, instructor guide, guide scripts and sample HTML/API pages. No official logo artwork or unprovided brand colors have been invented. Apply the team's approved logo/assets when supplied.
 
 ## Stable technical names
 
@@ -14,12 +14,12 @@ Set workshop resource names through the documented parameters; the lab scripts n
 
 The workshop fork is [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop), owned in Russ's personal GitHub account for now. A later transfer to the enterprise account is planned; its destination has not been selected. The fork retains the history of [Pamir/azure-migrate-workshop](https://github.com/Pamir/azure-migrate-workshop) and the original [MIT license](../LICENSE).
 
-The refreshed version is on [`codex/hyperv-workshop-refresh`](https://github.com/j33pguy/azure-migrate-workshop/tree/codex/hyperv-workshop-refresh) for draft pull-request review against the personal fork's `main` branch. The learner Quick Start explicitly selects this branch. Until that review is merged, `main` contains the original workshop.
+The refresh was merged into [`main`](https://github.com/j33pguy/azure-migrate-workshop/tree/main) through [PR #1](https://github.com/j33pguy/azure-migrate-workshop/pull/1) on September 8, 2026. The Quick Start now selects `main` for rehearsal and records its exact commit. Merging the engineering changes does not complete the live validation required for partner delivery.
 
 Before releasing a course version:
 
 1. Complete the [instructor rehearsal](Instructor-Guide.md), attach sanitized evidence and capture real screenshots if desired.
-2. Review and merge the refresh within the personal fork, update the Quick Start to the approved release, and tag that release. Keep all learners on the same revision.
+2. Review and merge any fixes found during rehearsal, repeat affected rehearsal gates, then tag the validated revision and update the Quick Start to that release. Keep all learners on the same revision.
 3. Confirm the team's support contact and apply approved logo assets when supplied.
 4. When transferring ownership later, update repository links, clone instructions and local Git remotes to the confirmed destination. Verify access and validation workflows there.
 

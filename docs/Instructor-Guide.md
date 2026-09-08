@@ -46,7 +46,7 @@ Do not put passwords, project registration keys, SAS URLs or identifiable partic
 2. **Nested appliance topology:** this lab uses internal NAT/DHCP; Microsoft's production appliance prerequisites describe an external switch. Record the actual installer/discovery result and describe the topology as a training adaptation.
 3. **Online installers:** the Windows image, Ubuntu `current` image and several package feeds move independently of Git. Validate them shortly before delivery and record the resolved versions. The code validates some signatures/hashes but is not a reproducible offline build.
 4. **Original Microsoft source:** the supplied repository's history has one initial commit and does not record a Microsoft parent. Obtain the original source URL before finalizing its full attribution trail.
-5. **Course release:** the fork is owned by [j33pguy](https://github.com/j33pguy/azure-migrate-workshop); the refresh is on `codex/hyperv-workshop-refresh` for draft review. Rehearse before merging and tagging the version for partner delivery. See [Branding and forking](Branding-and-Forking.md).
+5. **Course release:** the fork is owned by [j33pguy](https://github.com/j33pguy/azure-migrate-workshop); the refresh was merged to `main` on September 8, 2026. Record the exact rehearsal commit, fix any failures, and repeat affected gates before tagging a version for partner delivery. See [Branding and forking](Branding-and-Forking.md).
 
 ## Teaching suggestions
 
