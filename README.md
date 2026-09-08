@@ -4,7 +4,7 @@
 
 Discover, assess, test and migrate four Hyper-V VMs to Azure, then validate and clean up the environment. All four workloads use the **Hyper-V host replication provider**. The discovery appliance performs assessment; the replication provider on the Hyper-V host moves VM data. SQL Server does not require a different replication architecture simply because it stores data. [Microsoft Hyper-V migration tutorial](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v)
 
-**Release status:** engineering review draft, refreshed September 5, 2026. Static validation is available in this repository. An instructor must complete the [live rehearsal](docs/Instructor-Guide.md) before partner delivery. No Azure deployment or migration was performed during the code review.
+**Release status:** engineering refresh merged to `main` on September 8, 2026; awaiting live rehearsal. Automated Windows and Linux checks pass, but an instructor must complete the [live rehearsal](docs/Instructor-Guide.md) before partner delivery. No Azure deployment or migration was performed during the code review.
 
 ## Learning path
 
@@ -53,11 +53,12 @@ The sites and Node API are independent samples. The IIS page is static; Nginx is
 ## Start here
 
 1. Read [Module 0](docs/Module-0-Setup.md), including subscription, quota, licensing, downloads and cost preparation.
-2. Obtain the reviewed version from [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop/tree/codex/hyperv-workshop-refresh). While the refresh is in draft review, use the branch below; the fork's `main` branch still contains the original workshop. Run these commands in a terminal, then continue from the repository directory:
+2. Obtain the merged version from [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop/tree/main). Use `main` for rehearsal and record the exact commit shown below. For partner delivery, the instructor must supply the release tag or commit that passed rehearsal so every learner uses the same revision. Run these commands in a terminal, then continue from the repository directory:
 
    ```bash
-   git clone --branch codex/hyperv-workshop-refresh https://github.com/j33pguy/azure-migrate-workshop.git
+   git clone --branch main https://github.com/j33pguy/azure-migrate-workshop.git
    cd azure-migrate-workshop
+   git rev-parse HEAD
    ```
 
 3. In a PowerShell session with the current Az modules, choose your dedicated subscription and variables:
