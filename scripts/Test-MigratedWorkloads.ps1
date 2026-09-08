@@ -47,13 +47,15 @@ try {
 $linuxWebCheck = @'
 set -eu
 systemctl is-active --quiet nginx
-curl --fail --silent --show-error http://127.0.0.1/ | grep -q 'TD SYNNEX'
+page=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 20 http://127.0.0.1/)
+printf '%s\n' "$page" | grep -q 'TD SYNNEX'
 printf '%s\n' WORKLOAD_VALIDATED
 '@
 $linuxAppCheck = @'
 set -eu
 systemctl is-active --quiet contoso-app
-curl --fail --silent --show-error http://127.0.0.1:3000/api/health | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "healthy"'
+response=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 20 http://127.0.0.1:3000/api/health)
+printf '%s\n' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("status") == "healthy" and data.get("server") == "OnPrem-Linux-App" else 1)'
 printf '%s\n' WORKLOAD_VALIDATED
 '@
 $checks = @(

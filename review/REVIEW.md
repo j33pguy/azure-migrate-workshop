@@ -4,6 +4,8 @@
 
 **Disposition: revised engineering draft; live rehearsal required before partner delivery.** The supplied version contains material deployment and teaching errors. This review corrects the documented workflow and prepares local code changes; it does not certify a working Azure migration without running it.
 
+The original 33 findings below are retained as the initial review record. See the [September 8 follow-up fixes](FOLLOWUP-FIXES.md) for additional corrections to template expansion, source/HTTP checks, success markers and SQL baseline comparison.
+
 ## Scope and evidence
 
 Reviewed source: [Pamir/azure-migrate-workshop](https://github.com/Pamir/azure-migrate-workshop/tree/19772aef0349baa5003650931f409e34d3fc3a7f), commit `19772aef0349baa5003650931f409e34d3fc3a7f` (March 24, 2026). Scope includes all six original modules, README, all eight original PowerShell scripts, license and repository metadata: **17 files**. [Source inventory](source-inventory.json) records line counts and broken local references.

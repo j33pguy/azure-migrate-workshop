@@ -14,7 +14,7 @@ Complete Module 1 and keep HyperVHost running throughout replication.
 4. Wait until the Hyper-V host appears as a registered migration source. Verify its outbound access using the current URL list in the support matrix.
 5. If the host or any workload is already protected by Site Recovery or Hyper-V Replica, stop and resolve that conflict before enrolling it in this lab's migration flow.
 
-Use the current portal-supplied installers and keys. The source repository's generic `New-AzMigrateServerReplication` examples are not used: its parameter sets and VMware machine/disk types do not implement this Hyper-V walkthrough. [Migration tutorial](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v), [Hyper-V migration support](https://learn.microsoft.com/azure/migrate/migrate-support-matrix-hyper-v-migration), [cmdlet reference](https://learn.microsoft.com/powershell/module/az.migrate/new-azmigrateserverreplication)
+Use the current portal-supplied installers and keys. Follow the Hyper-V provider setup for this project before enabling replication. [Migration tutorial](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v), [Hyper-V migration support](https://learn.microsoft.com/azure/migrate/migrate-support-matrix-hyper-v-migration)
 
 ## 2. Review source readiness
 
@@ -27,6 +27,15 @@ From the host, confirm each workload is running and Module 0's endpoint tests st
 - The four standalone workload disks are selected; the cloud-init seed DVDs are detached. Do not select the appliance for replication.
 
 Do not alter a source network during active cutover without recording the change. A DHCP reservation on HyperVHost is not an Azure static-IP assignment.
+
+Before enabling replication, copy the single, self-contained [SQL data helper](../scripts/Test-LabSqlData.ps1) from the reviewed checkout to `C:\LabTools\Test-LabSqlData.ps1` **inside OnPrem-SQL**. Stop edits to the sample database and run this in Windows PowerShell as the guest administrator:
+
+```powershell
+C:\LabTools\Test-LabSqlData.ps1 -Capture -BaselinePath C:\LabEvidence\source-pretest.baseline.json
+Get-FileHash C:\LabEvidence\source-pretest.baseline.json -Algorithm SHA256
+```
+
+Keep an independent copy of the baseline and its SHA256 in the instructor's evidence record outside the lab VM and Git. The helper and baseline on the SQL OS disk will also be replicated into the test VM. Leave sample data unchanged until that comparison passes. Existing baseline files are protected from overwrite; use a new filename when deliberately capturing another baseline.
 
 ## 3. Configure replication
 
@@ -74,7 +83,16 @@ $testLinuxApp = Read-Host 'Actual Linux app test VM name'
     -LinuxWebVM $testLinuxWeb -LinuxAppVM $testLinuxApp
 ```
 
-Expect four PASS results. The helper checks IIS, Nginx and the real `/api/health` endpoint. For SQL it checks `SQLEXPRESS`, `ContosoApp`, `DBCC CHECKDB`, and the actual `Customers`/`Orders` tables. Counts of at least five are only a smoke test: compare exact source values as described in Module 3.
+Expect four PASS results. The helper checks IIS, Nginx and the real `/api/health` endpoint. For SQL it checks `SQLEXPRESS`, `ContosoApp`, `DBCC CHECKDB`, and the actual `Customers`/`Orders` tables. Counts of at least five are only a smoke test.
+
+Inside the **SQL test VM**, use Windows PowerShell (or the portal's PowerShell Run command) to verify that the replicated baseline's SHA256 matches the independent source record, then compare the data:
+
+```powershell
+Get-FileHash C:\LabEvidence\source-pretest.baseline.json -Algorithm SHA256
+C:\LabTools\Test-LabSqlData.ps1 -BaselinePath C:\LabEvidence\source-pretest.baseline.json
+```
+
+Expect `SQL_DATA_MATCHED`. This compares every defined column in both sample tables, including `CreatedDate`, `OrderDate`, decimal values, nulls and case-sensitive text. A mismatch stops acceptance even if row counts are unchanged. If the baseline/helper is absent, resolve the replication point or file placement and repeat the test; do not create a new baseline from the test VM to make it pass. This helper uses Windows PowerShell 5.1 or PowerShell 7.5+ and requires the lab SQL permissions described in Module 3.
 
 If Run Command fails because the agent is not healthy, that is a failed test. Inspect boot diagnostics and obtain private interactive access to repair the image; do not mark the VM validated because it appears “Running.”
 

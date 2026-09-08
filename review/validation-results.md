@@ -20,3 +20,20 @@ Tools used locally: PowerShell 7.6.5; Node.js 26.8.1 for syntax checking; Python
 No Azure login, deployment, replication, cutover, backup, subscription setting change or actual resource deletion was performed. Cleanup tests use local mocks. A live rehearsal is required, as detailed in the instructor guide.
 
 Az definition versions checked: Az.Accounts 5.5.3, Az.Compute 11.9.0, Az.Network 8.2.0, Az.Resources 10.2.0. Parameter-name inspection does not validate full parameter sets, values or service behavior. Download checks do not execute installers or verify their entire dependency chains. Signed redirect query strings were removed from the saved download evidence.
+
+## Follow-up validation · September 8, 2026
+
+The [follow-up fixes](FOLLOWUP-FIXES.md) extend the initial review. Local results:
+
+| Check | Result |
+|---|---|
+| PowerShell suite | 16 checks pass, including token-like passwords, default IIS content, exact remote success markers and SQL data/serialization regressions |
+| Linux generated configuration | Actual PowerShell renderer/assignment preserves all six difficult-password cases; YAML and shell checks pass |
+| Linux workload HTTP checks | Real shell scripts tested with stub executables; six success/failure cases pass, including failed requests that print matching content |
+| Embedded Node application | JavaScript syntax and package JSON checks pass |
+| Documentation | 15 Markdown files checked, including every review document |
+| Az definitions | The same 35 Azure command names/explicit parameters resolve against the module versions above |
+| Windows PowerShell 5.1 | Added a dedicated GitHub Actions job; current result is attached to draft PR #1 |
+| Azure execution | Read-only account-context check only; no resource creation/change or live SQL connection |
+
+Windows/Hyper-V and live Azure rehearsal remain outstanding. Hosted Windows syntax/fixture checks are not host provisioning or migration tests. External URL/download checks above are dated September 5; this follow-up did not rerun that whole network scan.

@@ -91,6 +91,7 @@ The deployment scripts require **new, dedicated resource groups**. They intentio
 | `migrate-step1-setup-project.ps1` | Billable target/test network preparation; portal project creation follows |
 | `migrate-step2` through `migrate-step5` | Local guides to the supported Hyper-V portal workflow; no migration automation |
 | `Test-MigratedWorkloads.ps1` | Executes smoke tests inside explicitly named Azure VMs using their VM agents |
+| `Test-LabSqlData.ps1` | Runs inside the SQL VM; captures or compares every defined column of the two sample tables against a preserved source baseline |
 | `migrate-step6-post-migration.ps1` | Read-only VM inventory and Module 5 handoff |
 | `cleanup-lab.ps1` | Preview/confirmed deletion of explicitly named, tagged groups; refuses vaults and locks |
 
@@ -107,6 +108,6 @@ Follow [Cleanup](docs/Cleanup.md) before running the deletion without `-WhatIf`.
 
 ## Maintenance and provenance
 
-Run `pwsh -NoProfile -File tests/Validate-Repository.ps1` and `python3 tests/check_docs.py` before sharing changes. See the [review findings](review/REVIEW.md), [instructor checklist](docs/Instructor-Guide.md), and [branding guide](docs/Branding-and-Forking.md).
+Run `pwsh -NoProfile -File tests/Validate-Repository.ps1` and `python3 tests/check_docs.py` before sharing changes. CI also runs the checks with Windows PowerShell 5.1 and exercises Linux HTTP failure handling. See the [review findings](review/REVIEW.md), [September 8 fixes](review/FOLLOWUP-FIXES.md), [instructor checklist](docs/Instructor-Guide.md), and [branding guide](docs/Branding-and-Forking.md).
 
 The supplied source has an [MIT license](LICENSE) attributed to Pamir Erdem. Its GitHub metadata reports a standalone repository; the claimed Microsoft original was not identified. Preserve the existing license and trace the original source before making Microsoft-derived attribution claims. See [NOTICE](NOTICE.md).

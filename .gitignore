@@ -21,6 +21,8 @@ __pycache__/
 *.rdp
 *.bak
 *-session-evidence.*
+*.baseline.json
+rehearsal-evidence/
 *.vhd
 *.vhdx
 *.iso
