@@ -33,6 +33,8 @@ The suite now contains **22 local checks**. Resource lookups and deletions in th
 
 ## Remaining runtime work
 
+The new [rehearsal runner](../docs/Automated-Rehearsal.md) provides a single Windows launcher for the ordered work, resumable results, automatic workload/network/SQL checks and explicit instructor checkpoints. It stops on failure, does not replay uncertain provisioning, and requires separate cleanup approval. Its simulated tests are recorded in [validation results](validation-results.md); no live rehearsal is implied by the runner's availability.
+
 No Azure resources have been created or changed by this follow-up. A read-only Azure account-context check was performed. The source deployment, Windows/Hyper-V operations, appliance installation and internal NAT topology, SQL installer and live SQL connection, replication, migration and real cleanup still require the [instructor rehearsal](../docs/Instructor-Guide.md).
 
 The baseline helper validates the defined sample-table data; it is not a substitute for backup/restore, full schema comparison or business acceptance testing. PowerShell 5.1 and 7.5+ JSON handling is explicitly supported. Source/target writers must be controlled throughout cutover.
