@@ -2,6 +2,8 @@
 
 **Cloud Enablement Services** · Partner hands-on training
 
+Read the course in the [workshop wiki](https://github.com/j33pguy/azure-migrate-workshop/wiki), or use the versioned local guides linked below. The [maintenance guide](docs/Repository-Maintenance.md) explains how the two stay synchronized.
+
 Discover, assess, test and migrate four Hyper-V VMs to Azure, then validate and clean up the environment. All four workloads use the **Hyper-V host replication provider**. The discovery appliance performs assessment; the replication provider on the Hyper-V host moves VM data. SQL Server does not require a different replication architecture simply because it stores data. [Microsoft Hyper-V migration tutorial](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v)
 
 **Release status:** engineering refresh merged to `main` on September 8, 2026; awaiting live rehearsal. Automated Windows and Linux checks pass, but an instructor must complete the [live rehearsal](docs/Instructor-Guide.md) before partner delivery. No Azure deployment or migration was performed during the code review.
