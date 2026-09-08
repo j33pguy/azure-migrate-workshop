@@ -52,6 +52,8 @@ The sites and Node API are independent samples. The IIS page is static; Nginx is
 
 ## Start here
 
+For an instructor rehearsal, use the [single-launcher walkthrough](docs/Automated-Rehearsal.md) and double-click [Start-Rehearsal.cmd](Start-Rehearsal.cmd) on Windows. It runs scripted stages in order, pauses for portal/evidence checkpoints and saves a resumable report. The manual learner path follows below.
+
 1. Read [Module 0](docs/Module-0-Setup.md), including subscription, quota, licensing, downloads and cost preparation.
 2. Obtain the merged version from [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop/tree/main). Use `main` for rehearsal and record the exact commit shown below. For partner delivery, the instructor must supply the release tag or commit that passed rehearsal so every learner uses the same revision. Run these commands in a terminal, then continue from the repository directory:
 
@@ -87,6 +89,7 @@ The deployment scripts require **new, dedicated resource groups**. They intentio
 
 | Script | Behavior |
 |---|---|
+| `Start-LabRehearsal.ps1` | Ordered, resumable instructor rehearsal; automatic checks plus explicit manual checkpoints, reports and separate deployment/cleanup approval |
 | `deploy-lab.ps1` | Billable source host, nested guests, DHCP/NAT and samples; protected setup parameters; fails if readiness is not observed |
 | `host/configure-host.ps1` | Runs inside the Windows host; creates the four workloads and the appliance OS VM |
 | `migrate-step1-setup-project.ps1` | Billable target/test network preparation; portal project creation follows |
@@ -109,6 +112,6 @@ Follow [Cleanup](docs/Cleanup.md) before running the deletion without `-WhatIf`.
 
 ## Maintenance and provenance
 
-Run `pwsh -NoProfile -File tests/Validate-Repository.ps1` and `python3 tests/check_docs.py` before sharing changes. CI also runs the checks with Windows PowerShell 5.1 and exercises Linux HTTP failure handling. See the [review findings](review/REVIEW.md), [September 8 fixes](review/FOLLOWUP-FIXES.md), [instructor checklist](docs/Instructor-Guide.md), and [branding guide](docs/Branding-and-Forking.md).
+Run `pwsh -NoProfile -File scripts/Start-LabRehearsal.ps1 -Mode Validate` and `python3 tests/check_docs.py` before sharing changes. CI also runs the PowerShell checks with Windows PowerShell 5.1 and exercises Linux HTTP failure handling. See the [review findings](review/REVIEW.md), [September 8 fixes](review/FOLLOWUP-FIXES.md), [instructor checklist](docs/Instructor-Guide.md), and [branding guide](docs/Branding-and-Forking.md).
 
 The supplied source has an [MIT license](LICENSE) attributed to Pamir Erdem. Its GitHub metadata reports a standalone repository; the claimed Microsoft original was not identified. Preserve the existing license and trace the original source before making Microsoft-derived attribution claims. See [NOTICE](NOTICE.md).

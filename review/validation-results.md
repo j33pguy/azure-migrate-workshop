@@ -47,3 +47,11 @@ All 35 Azure command names and explicitly named parameters still resolve offline
 ## Merge verification · September 8, 2026
 
 PR #1 was merged to `main` at commit `72fafbfa0c6b94a3538582ae71e795e1bb8ec8b3`. The [validation workflow on the merged commit](https://github.com/j33pguy/azure-migrate-workshop/actions/runs/34261928703) passed. The merged version is ready for an instructor rehearsal; live deployment, migration and cleanup remain untested. The Quick Start now uses `main` and instructs the instructor to record and later pin the validated revision.
+
+## Rehearsal runner validation · September 8, 2026
+
+The [rehearsal runner](../docs/Automated-Rehearsal.md) adds a Windows launcher, 28-stage progress ledger and local HTML report. Fifteen stages execute scripts/checks; thirteen are explicitly recorded instructor checkpoints. The workflow does not claim fully unattended Azure Migrate orchestration.
+
+The existing 22 PowerShell checks are retained. Thirteen new rehearsal checks exercise the full sequence using simulated adapters, pause/resume without repeated actions, separate provisioning/deletion approvals, missing/old evidence, credential/exception handling, safe retries, interrupted provisioning, configuration/source drift, evidence integrity, exclusive locking, HTML encoding, network placement/probes, independent SQL baselines and partial cleanup verification. CI runs the new suite under Windows PowerShell 5.1 and PowerShell 7 on Linux. The PowerShell launcher exposes Plan and Validate modes that do not contact Azure.
+
+All 37 Azure cmdlet names and explicitly named parameters resolve offline against the module versions recorded above; full parameter values/service behavior remain untested. Local documentation checks cover 16 Markdown files. The Windows launcher, authentication, source deployment, appliance/provider setup, replication, migration and actual cleanup have not been rehearsed against live Azure. The first real run must validate the runner as well as the workshop.

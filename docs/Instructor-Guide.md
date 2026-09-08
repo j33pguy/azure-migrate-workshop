@@ -4,6 +4,8 @@
 
 This is the release gate for partner delivery. The repository has received a static engineering review; a passing syntax check is not an Azure deployment test. Use one clean environment from beginning to end before scheduling a delivery against this version.
 
+Use the [rehearsal launcher](Automated-Rehearsal.md) to run the scripted stages and collect checkpoint evidence in order. Its report distinguishes automated passes from instructor-recorded outcomes. Use the table below to retain the full release evidence, including checks that the runner does not automate.
+
 ## Prepare the session
 
 - Obtain the final fork URL, release/commit and reviewed package list. Keep every learner on the same revision.

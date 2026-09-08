@@ -1,0 +1,10 @@
+{
+  "SubscriptionId": "00000000-0000-0000-0000-000000000000",
+  "TenantId": "00000000-0000-0000-0000-000000000000",
+  "Location": "eastus",
+  "SourceResourceGroup": "rg-ces-source-rehearsal-01",
+  "TargetResourceGroup": "rg-ces-target-rehearsal-01",
+  "AdminUsername": "labadmin",
+  "AdminSourceCidr": "YOUR_PUBLIC_IPV4/32",
+  "VMSize": "Standard_E8s_v5"
+}
