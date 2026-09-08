@@ -18,6 +18,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/common.ps1"
+Assert-LabWorkloadNames @($WindowsWebVM,$SqlVM,$LinuxWebVM,$LinuxAppVM)
 $null = Assert-LabContext $SubscriptionId
 $null = Assert-LabResourceGroup $ResourceGroupName
 $webCheck = @'
@@ -67,7 +68,9 @@ $checks = @(
 $failures = @()
 foreach ($check in $checks) {
     try {
-        $vm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $check.VM -ErrorAction Stop
+        $matches = @(Get-AzVM -ResourceGroupName $ResourceGroupName -Name $check.VM -ErrorAction Stop)
+        if ($matches.Count -ne 1 -or $matches[0].Name -ne $check.VM) { throw 'Azure did not return the exact requested VM.' }
+        $vm = $matches[0]
         if ([string]$vm.StorageProfile.OsDisk.OsType -ne $check.OS) { throw 'Unexpected operating system.' }
         $result = Invoke-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $check.VM -CommandId $check.Command -ScriptString $check.Script -ErrorAction Stop
         $null = Assert-LabRunResult $result 'WORKLOAD_VALIDATED'

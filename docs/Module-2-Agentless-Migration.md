@@ -71,7 +71,7 @@ The test VNet has no peering to source or target. Its NAT gateway permits outbou
 
 A private IP is not reachable from an ordinary workstation or unconnected Cloud Shell. Use Azure VM **Run command**, or an instructor-provided Bastion connection. No public IP is added to the test VMs by this lab.
 
-Run the helper from the repository root in your Azure PowerShell session. Copy the exact VM names from the portal:
+Run the helper from the repository root in your Azure PowerShell session. Copy four distinct, exact VM names from the portal. Duplicate names (even with different capitalization), wildcards and whitespace are rejected before running any VM checks:
 
 ```powershell
 $testWindowsWeb = Read-Host 'Actual Windows web test VM name'

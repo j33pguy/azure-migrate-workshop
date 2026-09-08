@@ -60,7 +60,9 @@ Estimate all resources listed in the [README](../README.md). NAT gateways and IP
 
 ## 4. Deploy
 
-Use your current internet-facing IPv4 address with `/32`, including any VPN/corporate egress address. The RDP rule only permits that address. If your address changes, update the existing host NSG rule after verifying the new address.
+Use your current internet-facing IPv4 address with `/32`, including any VPN/corporate egress address. Write all four decimal octets without leading zeros; abbreviated, hexadecimal and integer address forms are rejected. The RDP rule only permits that address. If your address changes, update the existing host NSG rule after verifying the new address.
+
+Keep the complete reviewed checkout together. Deployment reads and parses `scripts/host/configure-host.ps1` before contacting Azure; a missing, empty or syntactically invalid host payload stops setup before resource creation. Source/target group existence checks also stop on authentication, permission or network failures instead of assuming the group is available.
 
 ```powershell
 $sourceRg = 'rg-ces-source-01'
@@ -116,6 +118,8 @@ Expect five rows in each table on a fresh lab. This local sample uses a self-sig
 | Symptom | Check |
 |---|---|
 | Deployment refuses the group | The script requires a new dedicated group. Inspect/clean up the failed group; do not rerun provisioning after migration begins. |
+| Group lookup cannot be verified | Check the exact subscription, current login, read permissions and Azure connectivity. A denied read is not a missing group. |
+| Host configuration file missing or invalid | Obtain the complete reviewed repository revision; keep the `scripts/host` directory with `deploy-lab.ps1`. |
 | Hyper-V fails | VM family, security type, policy, available quota and vmms service after restart |
 | Guest has no address | DHCP bound only to `vEthernet (intSwitch)`, scope active, reservation MAC matches guest NIC |
 | Package installation fails | `C:\AzMigrateLab\setup-log.txt`; package source access; installer exit codes; free disk space |

@@ -37,3 +37,9 @@ The [follow-up fixes](FOLLOWUP-FIXES.md) extend the initial review. Local result
 | Azure execution | Read-only account-context check only; no resource creation/change or live SQL connection |
 
 Windows/Hyper-V and live Azure rehearsal remain outstanding. Hosted Windows syntax/fixture checks are not host provisioning or migration tests. External URL/download checks above are dated September 5; this follow-up did not rerun that whole network scan.
+
+## Deployment and cleanup validation · September 8, 2026
+
+The next pass extends the suite to **22 checks**. Added coverage includes exact resource-group identity and ARM error handling, wildcard refusal before any lookup, both vault types, all-group preflight and locks, verified post-delete absence, distinct VM names, canonical IPv4 text, and missing/invalid host payload refusal before Azure module import. Cleanup commands in these tests call local mocks, including the simulated successful deletion printed by the test suite.
+
+All 35 Azure command names and explicitly named parameters still resolve offline. The resource-group lookup now uses `Invoke-AzRestMethod` in place of `Get-AzResourceGroup`; the command count remains the same. Existing payload and documentation checks are retained. Hosted Windows/Linux results are attached to [draft PR #1](https://github.com/j33pguy/azure-migrate-workshop/pull/1). No Azure resources were created, changed or deleted during this pass.
