@@ -1,76 +1,35 @@
 <#
 .SYNOPSIS
-    Removes the Azure Migrate Workshop lab environment.
-
+Delete explicitly named, tagged workshop resource groups.
 .DESCRIPTION
-    Deletes the specified Azure Resource Group and all resources within it,
-    including the Hyper-V host VM, networking, and disks.
-
-.PARAMETER ResourceGroupName
-    Name of the Azure Resource Group to delete.
-
-.PARAMETER Force
-    Skip the confirmation prompt and delete immediately.
-
-.EXAMPLE
-    .\cleanup-lab.ps1 -ResourceGroupName "rg-migrate-workshop"
-
-.EXAMPLE
-    .\cleanup-lab.ps1 -ResourceGroupName "rg-migrate-workshop" -Force
+Use -WhatIf to preview. Requires the exact subscription and workshop tags.
+Lists all resources and requests confirmation. Does not disable vault soft
+delete, remove backups, bypass locks, or change subscription-wide services.
 #>
-
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess, ConfirmImpact='High')]
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$ResourceGroupName,
-
-    [Parameter(Mandatory = $false)]
-    [switch]$Force
+    [Parameter(Mandatory)][string]$SubscriptionId,
+    [Parameter(Mandatory)][string[]]$ResourceGroupName
 )
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
-function Write-Log {
-    param([string]$Message)
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message" -ForegroundColor Cyan
-}
-
-# Verify Azure context
-try {
-    $context = Get-AzContext
-    if (-not $context) {
-        throw "Not logged in to Azure. Run Connect-AzAccount first."
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/common.ps1"
+$null = Assert-LabContext $SubscriptionId
+# Reject every invalid name before querying or deleting any group.
+foreach ($name in $ResourceGroupName) { Assert-LabResourceGroupName $name }
+$groups = @()
+foreach ($name in ($ResourceGroupName | Select-Object -Unique)) {
+    $groups += Assert-LabResourceGroup $name
+    $resources = @(Get-AzResource -ResourceGroupName $name -ErrorAction Stop)
+    $resources | Select-Object Name,ResourceType,ResourceGroupName | Format-Table -AutoSize
+    if (@($resources | Where-Object { $_.ResourceType -in @('Microsoft.RecoveryServices/vaults','Microsoft.DataProtection/backupVaults') }).Count) {
+        throw "Group '$name' contains a backup or Recovery Services vault. Complete migration/test cleanup and the applicable vault cleanup procedure in docs/Cleanup.md, then rerun."
     }
-} catch {
-    throw "Azure authentication required. Run Connect-AzAccount before executing this script. Error: $_"
+    if (@(Get-AzResourceLock -ResourceGroupName $name -ErrorAction Stop).Count) { throw "Group '$name' contains resource locks. Review them explicitly before cleanup." }
 }
-
-# Check if resource group exists
-$rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
-if (-not $rg) {
-    Write-Log "Resource Group '$ResourceGroupName' does not exist. Nothing to clean up."
-    return
-}
-
-# Confirm deletion
-if (-not $Force) {
-    Write-Log "WARNING: This will permanently delete Resource Group '$ResourceGroupName' and ALL resources within it."
-    Write-Log "Location: $($rg.Location)"
-    $confirmation = Read-Host "Are you sure you want to proceed? (yes/no)"
-    if ($confirmation -ne "yes") {
-        Write-Log "Cleanup cancelled."
-        return
+foreach ($group in $groups) {
+    if ($PSCmdlet.ShouldProcess("Subscription $SubscriptionId / $($group.ResourceGroupName)", 'Permanently delete resource group and every listed resource')) {
+        Remove-AzResourceGroup -Name $group.ResourceGroupName -Force -ErrorAction Stop | Out-Null
+        if (Get-LabResourceGroup -Name $group.ResourceGroupName -AllowMissing) { throw "Deletion did not complete for $($group.ResourceGroupName)." }
+        Write-Host "Deleted: $($group.ResourceGroupName)"
     }
 }
-
-# Delete the resource group
-Write-Log "Deleting Resource Group '$ResourceGroupName'..."
-try {
-    Remove-AzResourceGroup -Name $ResourceGroupName -Force -ErrorAction Stop | Out-Null
-    Write-Log "Resource Group '$ResourceGroupName' deleted successfully."
-} catch {
-    throw "Failed to delete Resource Group: $_"
-}
-
-Write-Log "Cleanup complete."
