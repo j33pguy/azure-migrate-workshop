@@ -23,6 +23,7 @@ __pycache__/
 *-session-evidence.*
 *.baseline.json
 rehearsal-evidence/
+rehearsal.local.json
 *.vhd
 *.vhdx
 *.iso
