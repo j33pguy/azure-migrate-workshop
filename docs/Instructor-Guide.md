@@ -30,10 +30,10 @@ Copy this table into your session notes and replace **Not run** only with record
 | Provider | Current Hyper-V host provider/agent installed and registered to the intended project | Not run |
 | Replication | All four jobs healthy; initial synchronization finishes; actual lag/status captured | Not run |
 | Test boot/agent | All four Azure test VMs boot and VM Run Command works without adding public IPs | Not run |
-| Test workload | Four helper PASS results plus SQL exact baseline and private network checks | Not run |
+| Test workload | Four helper PASS results, independent pretest baseline SHA256, `SQL_DATA_MATCHED`, private network checks | Not run |
 | Test cleanup | Service-managed test cleanup complete; actual test artifacts removed | Not run |
 | Cutover | Planned shutdown, final sync, start/end timing, all source workload VMs off | Not run |
-| Acceptance | Four target PASS results; exact SQL rows match; target network checks; complete migration | Not run |
+| Acceptance | Four target PASS results; independent precutover baseline SHA256 and `SQL_DATA_MATCHED`; target network checks; complete migration | Not run |
 | Monitoring, if included | Identity + AMA + OS-specific DCR/association + actual query evidence | Not run |
 | Backup, if included | Successful recovery point and real restore validation, not just backup enablement | Not run |
 | Cleanup | Resource inventory empty or every retained item assigned an owner/deletion date | Not run |
@@ -73,6 +73,8 @@ python3 tests/check_docs.py --external
 ```
 
 On Windows, use the equivalent `.venv\Scripts\python.exe` path and a bash-capable environment for the payload shell checks. The external-link check records HTTP status/redirects; it cannot validate a tenant-specific portal operation or every download in an installer chain.
+
+CI runs the PowerShell checks under Windows PowerShell 5.1 as well as PowerShell 7 on Linux. These jobs use local fixtures/mocks and do not execute the Windows host setup, installers or a real SQL connection. The SQL baseline helper supports Windows PowerShell 5.1 and PowerShell 7.5+; earlier PowerShell 7 versions do not expose the required JSON timestamp-preservation option.
 
 Optional installed-Az metadata check (no authentication or Azure API calls):
 

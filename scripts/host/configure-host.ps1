@@ -28,6 +28,31 @@ function Write-Log {
     Add-Content -Path $logFile -Value $entry -ErrorAction SilentlyContinue
 }
 
+function Expand-LabTextTemplate {
+    param([string]$Template, [System.Collections.IDictionary]$Values)
+    # Replace only tokens present in the template. Never interpret inserted
+    # passwords as more template tokens, PowerShell, or regex replacements.
+    return [regex]::Replace($Template, '__[A-Z][A-Z0-9_]*__', [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        if (-not $Values.Contains($match.Value)) { throw "Missing template value: $($match.Value)" }
+        return [string]$Values[$match.Value]
+    })
+}
+
+function Assert-LabSourceWorkloads {
+    foreach ($address in @('http://192.168.0.10','http://192.168.0.12')) {
+        $page = Invoke-WebRequest $address -UseBasicParsing -TimeoutSec 10
+        if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'TD SYNNEX') {
+            throw "Workshop sample site missing at $address."
+        }
+    }
+    $api = Invoke-RestMethod 'http://192.168.0.13:3000/api/health' -TimeoutSec 10
+    if ($api.status -ne 'healthy' -or $api.server -ne 'OnPrem-Linux-App') { throw 'Node API unhealthy or wrong application.' }
+    if (-not (Test-NetConnection 192.168.0.11 -Port 1433 -InformationLevel Quiet -WarningAction SilentlyContinue)) {
+        throw 'SQL TCP listener unavailable.'
+    }
+}
+
 $vhdPath       = "$labRoot\VHDs"
 $intSwitchName = "intSwitch"
 $natName       = "LabNAT"
@@ -274,7 +299,10 @@ function Create-WindowsGuestVM {
   </settings>
 </unattend>
 '@
-    $unattendXml = $unattendXml.Replace('__VMNAME__', $VMName).Replace('__IPADDRESS__', $IPAddress).Replace('__PASSWORD__', [System.Security.SecurityElement]::Escape($guestAdminPwd))
+    $unattendXml = Expand-LabTextTemplate $unattendXml @{
+        '__VMNAME__' = $VMName
+        '__PASSWORD__' = [System.Security.SecurityElement]::Escape($guestAdminPwd)
+    }
     $null = [xml]$unattendXml
     $unattendXml | Out-File -FilePath "$unattendDir\unattend.xml" -Encoding UTF8 -Force
 
@@ -358,7 +386,7 @@ ethernets:
     dhcp4: true
     dhcp-identifier: mac
 '@
-    $networkConfig = $networkConfig.Replace('__IPADDRESS__', $IPAddress).Replace('__MAC__', $macColon)
+    $networkConfig = Expand-LabTextTemplate $networkConfig @{ '__MAC__' = $macColon }
     [System.IO.File]::WriteAllText("$cloudInitDir\network-config", $networkConfig, [System.Text.UTF8Encoding]::new($false))
 
     $basePackages = @("openssh-server", "curl", "wget", "net-tools", "walinuxagent")
@@ -404,7 +432,12 @@ runcmd:
 __RUNYAML__
 '@
     $passwordYaml = ConvertTo-Json -InputObject $guestAdminPwd -Compress
-    $userData = $userData.Replace('__PASSWORD__', $passwordYaml).Replace('__USER__', $guestUser).Replace('__PKGYAML__', $pkgYaml).Replace('__RUNYAML__', $runYaml)
+    $userData = Expand-LabTextTemplate $userData @{
+        '__PASSWORD__' = $passwordYaml
+        '__USER__' = $guestUser
+        '__PKGYAML__' = $pkgYaml
+        '__RUNYAML__' = $runYaml
+    }
     [System.IO.File]::WriteAllText("$cloudInitDir\user-data", $userData, [System.Text.UTF8Encoding]::new($false))
 
     # Create cloud-init ISO
@@ -791,10 +824,7 @@ $deadline = (Get-Date).AddMinutes(20)
 $healthy = $false
 while ((Get-Date) -lt $deadline) {
     try {
-        if ((Invoke-WebRequest 'http://192.168.0.10' -UseBasicParsing -TimeoutSec 10).StatusCode -ne 200) { throw 'IIS unavailable.' }
-        if ((Invoke-WebRequest 'http://192.168.0.12' -UseBasicParsing -TimeoutSec 10).Content -notmatch 'TD SYNNEX') { throw 'Nginx sample site missing.' }
-        if ((Invoke-RestMethod 'http://192.168.0.13:3000/api/health' -TimeoutSec 10).status -ne 'healthy') { throw 'Node API unhealthy.' }
-        if (-not (Test-NetConnection 192.168.0.11 -Port 1433 -InformationLevel Quiet -WarningAction SilentlyContinue)) { throw 'SQL TCP listener unavailable.' }
+        Assert-LabSourceWorkloads
         $healthy = $true
         break
     } catch { Start-Sleep -Seconds 20 }

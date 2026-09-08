@@ -35,7 +35,9 @@ function Assert-LabRunResult {
     param([Parameter(Mandatory)]$Result, [Parameter(Mandatory)][string]$Marker)
     $stdout = @($Result.Value | Where-Object Code -Match 'StdOut' | ForEach-Object Message) -join "`n"
     $stderr = @($Result.Value | Where-Object Code -Match 'StdErr' | ForEach-Object Message) -join "`n"
-    if ($stdout -notmatch [regex]::Escape($Marker) -or -not [string]::IsNullOrWhiteSpace($stderr)) {
+    $failedStatuses = @($Result.Value | Where-Object { $_.Code -match '/(failed|error)(/|$)' })
+    $markerLine = '(?m)^' + [regex]::Escape($Marker) + '\r?$'
+    if ($failedStatuses.Count -gt 0 -or $stdout -cnotmatch $markerLine -or -not [string]::IsNullOrWhiteSpace($stderr)) {
         throw "Remote validation did not pass. Review the VM Run Command output. $stderr"
     }
     return $stdout
@@ -44,7 +46,7 @@ function Assert-LabRunResult {
 function Assert-LabManagedRunResult {
     param([Parameter(Mandatory)]$InstanceView)
     if ($InstanceView.ExecutionState -ne 'Succeeded' -or $null -eq $InstanceView.ExitCode -or $InstanceView.ExitCode -ne 0 -or
-        $InstanceView.Output -notmatch 'LAB_WORKLOADS_READY') {
+        $InstanceView.Output -cnotmatch '(?m)^LAB_WORKLOADS_READY\r?$') {
         throw 'Guest setup did not pass. Inspect the managed Run Command instance view and C:\AzMigrateLab\setup-log.txt.'
     }
 }

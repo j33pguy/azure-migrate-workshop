@@ -6,19 +6,16 @@ Plan and execute the final migration of all four VMs. SQL's data requires strong
 
 ## 1. Capture the source baseline
 
-Inside the SQL source VM, run the following in Windows PowerShell as the guest administrator. Save the output in the instructor's evidence record, outside source control if it contains participant information.
+Stop all writers to the sample database first, including learner edits, and leave them stopped through planned cutover. Inside the SQL source VM, use Windows PowerShell as the guest administrator. The [SQL data helper](../scripts/Test-LabSqlData.ps1) should already be at `C:\LabTools\Test-LabSqlData.ps1` from Module 2; copy it from the reviewed checkout if needed.
 
 ```powershell
-Invoke-Sqlcmd -ServerInstance '.\SQLEXPRESS' -TrustServerCertificate -Database ContosoApp -Query @'
-SELECT COUNT(*) AS CustomerCount FROM dbo.Customers;
-SELECT COUNT(*) AS OrderCount FROM dbo.Orders;
-SELECT CustomerID,FirstName,LastName,Email,City FROM dbo.Customers ORDER BY CustomerID;
-SELECT OrderID,CustomerID,ProductName,Quantity,UnitPrice FROM dbo.Orders ORDER BY OrderID;
-DBCC CHECKDB (N'ContosoApp') WITH NO_INFOMSGS;
-'@
+C:\LabTools\Test-LabSqlData.ps1 -Capture -BaselinePath C:\LabEvidence\source-precutover.baseline.json
+Get-FileHash C:\LabEvidence\source-precutover.baseline.json -Algorithm SHA256
 ```
 
-A fresh deployment contains five Customers and five Orders. Record actual values if learners changed the samples. The database and table names in this exercise match deployment; there is no `Products` table.
+A fresh deployment contains five Customers and five Orders. The helper checks database integrity and records all defined columns of both sample tables, including timestamp columns omitted by the old manual query. It reads the two tables within one transaction and preserves nulls and decimal precision. It validates this sample data only; it is not a schema comparison or a database backup.
+
+Retain an independent copy of this file and its SHA256 outside the source VM and Git. The copy on the OS disk travels with the final migration. Use the **precutover** file for final acceptance, even if the pretest baseline from Module 2 still exists. Existing files cannot be overwritten; if you deliberately capture again, use a new filename and record which file is authoritative.
 
 Take a separate database backup before the cutover exercise:
 
@@ -65,7 +62,14 @@ From your Azure PowerShell session, using the target names selected in Module 2:
     -LinuxWebVM OnPrem-Linux-Web -LinuxAppVM OnPrem-Linux-App
 ```
 
-Copy the SQL baseline query from section 1 and run it inside the migrated SQL VM using Run command or private interactive access. Compare **exact rows and counts**, not just database presence. Run `DBCC CHECKDB` and resolve reported errors. The lab grants the VM agent's local SYSTEM identity access to `ContosoApp` for these checks; that is sample-database permission, not a reusable production access design.
+Inside the migrated SQL VM, use Windows PowerShell or the portal's PowerShell Run command. Verify the copied baseline's SHA256 against the independent source record, then run the comparison:
+
+```powershell
+Get-FileHash C:\LabEvidence\source-precutover.baseline.json -Algorithm SHA256
+C:\LabTools\Test-LabSqlData.ps1 -BaselinePath C:\LabEvidence\source-precutover.baseline.json
+```
+
+Expect `SQL_DATA_MATCHED`. Missing columns, duplicate keys, changed row counts or changed values fail validation. The helper also runs `DBCC CHECKDB`; stop on any error. It does not print actual row values in mismatch errors. Do not capture a replacement baseline from the migrated VM. The lab grants the VM agent's local SYSTEM identity access to `ContosoApp` for these checks; that is sample-database permission, not a reusable production access design.
 
 Validate the sites and API using each VM's new private IP from another VM in the target VNet. Confirm DHCP addressing, DNS, time, disks and VM agent status. The sample web pages intentionally retain source-environment descriptions; copied HTML text is not authoritative evidence of where a VM is running. Use the Azure resource identity/private IP and `hostname` for that evidence.
 
