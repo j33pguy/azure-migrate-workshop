@@ -82,7 +82,7 @@ try {
         $directory=New-TestRun
         $plan=@(Get-RehearsalPlan)
         if ($plan.Count -ne 28 -or $calls.Count -ne 0 -or $plan[-1].Id -ne 'cleanup') { throw 'Unexpected plan or side effect.' }
-        foreach ($guide in @('Module-0-Setup.md','Module-1-Discovery.md','Module-2-Agentless-Migration.md','Module-3-Stateful-Migration.md','Module-4-ASR-Comparison.md','Module-5-Post-Migration.md','Cleanup.md')) {
+        foreach ($guide in @('Module-0-Setup.md','Module-1-Discovery.md','Module-2-HyperV-Migration.md','Module-3-Stateful-Migration.md','Module-4-ASR-Comparison.md','Module-5-Post-Migration.md','Cleanup.md')) {
             if ($guide -notin $plan.Guide) { throw "Missing guide $guide" }
         }
     }

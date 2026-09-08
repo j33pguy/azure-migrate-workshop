@@ -22,7 +22,7 @@ Use a dedicated training subscription or approved training resource groups. Conf
 | Guest addresses | DHCP reservations: web `.10`, SQL `.11`, Nginx `.12`, Node `.13`, appliance `.20` |
 | Targets | Separate target `10.1.0.0/16` and test `10.2.0.0/16` VNets; no peering |
 
-Nested vCPU allocation is oversubscribed; the appliance can have eight virtual processors because the host has eight. The old four-vCPU host could not satisfy the appliance's documented eight-vCPU requirement. The host's 64 GB provides room for the appliance, workloads and Windows. [Hyper-V appliance sizing](https://learn.microsoft.com/azure/migrate/deploy-appliance-script)
+Nested vCPU allocation is oversubscribed; the appliance can have eight virtual processors because the host has eight. The host's 64 GB provides room for the appliance, workloads and Windows. [Hyper-V appliance sizing](https://learn.microsoft.com/azure/migrate/deploy-appliance-script)
 
 Check the [VM size documentation](https://learn.microsoft.com/azure/virtual-machines/sizes/memory-optimized/esv5-series) and [nested virtualization setup](https://learn.microsoft.com/virtualization/hyper-v-on-windows/user-guide/nested-virtualization). Also reserve quota for four simultaneous test VMs and, later, four migrated VMs. Their family and regional quota are separate from the host's quota.
 

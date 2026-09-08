@@ -39,7 +39,7 @@ Keep the full checkout together. The deployment validates the host payload befor
 The appliance and the host replication provider have different jobs:
 
 - **Discovery/assessment problems:** inspect `MigrateAppl` connectivity/time/update checks, project registration, Hyper-V host credentials and host validation. Verify the four workload names individually and exclude the appliance from migration. Follow [Module 1](Module-1-Discovery.md).
-- **Replication problems:** inspect the provider/Recovery Services agent on **HyperVHost**, its registration to the intended project, source disk mappings, outbound access, cache storage, quotas and the per-VM job errors. Initial synchronization must complete before testing. Follow [Module 2](Module-2-Agentless-Migration.md).
+- **Replication problems:** inspect the provider/Recovery Services agent on **HyperVHost**, its registration to the intended project, source disk mappings, outbound access, cache storage, quotas and the per-VM job errors. Initial synchronization must complete before testing. Follow [Module 2](Module-2-HyperV-Migration.md).
 
 Do not introduce a guest Mobility Service or a separate SQL replication appliance to troubleshoot these Hyper-V workloads. Use the [Microsoft Hyper-V migration workflow](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v) and its [support matrix](https://learn.microsoft.com/azure/migrate/migrate-support-matrix-hyper-v-migration) for service prerequisites.
 
@@ -57,7 +57,7 @@ Do not introduce a guest Mobility Service or a separate SQL replication applianc
 | Source workloads still on | Review planned cutover/shutdown and job results. Keep only the intended writable copy online; use the recorded rollback decision. |
 | Test VMs remain | Complete Azure Migrate's service-managed test cleanup. Deleting only a VM does not complete that service operation. |
 
-Local service checks do not replace the network probes, independent SQL comparison or instructor acceptance. See [test migration](Module-2-Agentless-Migration.md) and [cutover](Module-3-Stateful-Migration.md).
+Local service checks do not replace the network probes, independent SQL comparison or instructor acceptance. See [test migration](Module-2-HyperV-Migration.md) and [cutover](Module-3-Stateful-Migration.md).
 
 ## Cleanup fails or costs remain
 

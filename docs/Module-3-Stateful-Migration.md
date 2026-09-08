@@ -2,7 +2,7 @@
 
 **TD SYNNEX | Cloud Enablement Services**
 
-Plan and execute the final migration of all four VMs. SQL's data requires stronger validation; it uses the same Hyper-V host provider as the web and Node workloads. This exercise replaces the previous guest-agent module.
+Plan and execute the final migration of all four VMs. SQL's data requires stronger validation; it uses the same Hyper-V host provider as the web and Node workloads.
 
 ## 1. Capture the source baseline
 
@@ -13,7 +13,7 @@ C:\LabTools\Test-LabSqlData.ps1 -Capture -BaselinePath C:\LabEvidence\source-pre
 Get-FileHash C:\LabEvidence\source-precutover.baseline.json -Algorithm SHA256
 ```
 
-A fresh deployment contains five Customers and five Orders. The helper checks database integrity and records all defined columns of both sample tables, including timestamp columns omitted by the old manual query. It reads the two tables within one transaction and preserves nulls and decimal precision. It validates this sample data only; it is not a schema comparison or a database backup.
+A fresh deployment contains five Customers and five Orders. The helper checks database integrity and records all defined columns of both sample tables, including timestamps. It reads the two tables within one transaction and preserves nulls and decimal precision. It validates this sample data only; it is not a schema comparison or a database backup.
 
 Retain an independent copy of this file and its SHA256 outside the source VM and Git. The copy on the OS disk travels with the final migration. Use the **precutover** file for final acceptance, even if the pretest baseline from Module 2 still exists. Existing files cannot be overwritten; if you deliberately capture again, use a new filename and record which file is authoritative.
 

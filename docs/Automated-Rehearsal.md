@@ -49,11 +49,11 @@ The report is a local rehearsal record, not a training certification. Reconcile 
 | Operate | Final inventory | Module 4 discussion and chosen Module 5 monitoring/backup/restore exercises |
 | Clean up | Preview; explicitly authorized group deletion; verify absence | Service/vault cleanup, retained evidence and any resources outside the groups |
 
-The runner has 28 ordered stages. Guide scripts are not executed as test steps; their printed instructions cannot produce an automated pass. The migration operations in the table are instructor checkpoints in this version.
+The runner has 28 ordered stages: 15 scripted stages and 13 instructor checkpoints. Migration operations in the table require instructor execution and evidence.
 
 ## SQL and network checks
 
-Follow the unchanged source-baseline steps in [Module 2](Module-2-Agentless-Migration.md) and [Module 3](Module-3-Stateful-Migration.md). The reviewed helper must be copied to `C:\LabTools\Test-LabSqlData.ps1` inside the source SQL VM. Capture these files there before the relevant synchronization point:
+Follow the source-baseline steps in [Module 2](Module-2-HyperV-Migration.md) and [Module 3](Module-3-Stateful-Migration.md). The reviewed helper must be copied to `C:\LabTools\Test-LabSqlData.ps1` inside the source SQL VM. Capture these files there before the relevant synchronization point:
 
 - Test: `C:\LabEvidence\source-pretest.baseline.json`.
 - Final cutover: `C:\LabEvidence\source-precutover.baseline.json`.

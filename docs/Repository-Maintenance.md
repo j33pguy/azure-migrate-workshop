@@ -12,7 +12,7 @@ The Git repository is the versioned source for scripts and course documentation.
 | Wiki home, sidebar and footer | `wiki/` | Wiki navigation and introduction |
 | Wiki page mapping | `wiki/pages.json` | Defines which sources/sections become wiki pages |
 | Deployment and validation logic | `scripts/`, `tests/` | Versioned runnable code and CI |
-| Review/validation history | `review/` | Engineering evidence; the validation record also appears in the wiki |
+| Release readiness | `docs/Instructor-Guide.md` and GitHub Actions | Current delivery gates and automated results for each revision |
 | License/provenance | `LICENSE`, `NOTICE.md` | Retained in the repository, packages and wiki links |
 | Private run settings/evidence | Ignored local files/directories | Instructor evidence only; never publish to the wiki |
 
@@ -39,25 +39,20 @@ Review the generated pages, then commit and push the wiki checkout. The Python p
 
 If a generated wiki page was edited directly, bring that improvement back into its maintained source first, review both versions, and reconcile the wiki checkout explicitly. Do not delete the ownership manifest to force an overwrite. Unmanaged custom wiki pages are preserved; add their reviewed source/mapping if they should join the managed publication.
 
-## Cleanup after the migration milestone
+## Maintain a clean course checkout
 
-Repository cleanup and deletion of live Azure lab resources are separate operations. Use [Cleanup](Cleanup.md) for cloud resources. The retirement list below is a plan; these files remain available in this revision. Apply removals at the agreed migration milestone after updating references and preserving any active rehearsal's pinned checkout.
+Keep current course instructions, runnable tools, tests and attribution in the repository. Use Git history for superseded review notes and retired files. Local external-link reports belong in ignored `.artifacts/`; private rehearsal evidence belongs in ignored `rehearsal-evidence/` or a separate approved location.
 
-The current retirement candidates are:
+Update guide links, rehearsal stages, tests and wiki mappings together when renaming or removing a file. Preserve an active rehearsal's pinned checkout and evidence before changing revisions: scripts, tests and guides are fingerprinted, and changing them prevents resume. Use [Cleanup](Cleanup.md) for Azure lab resources.
 
-| Candidate | Why it may be retired | Check before removal |
-|---|---|---|
-| `scripts/migrate-step2-discover-assess.ps1` through `migrate-step5-cutover.ps1` | These only print guide instructions; the rehearsal launcher and wiki now provide the ordered handoffs | Confirm no instructor still uses these legacy entry points; update the README script inventory |
-| `docs/Module-3-Agent-Based-Migration.md` | Compatibility redirect to the current Hyper-V cutover module | Confirm previously shared links can be retired; retain the replacement module |
-| `Module-2-Agentless-Migration.md` filename | Historical terminology; content already uses the Hyper-V provider workflow | If renamed, update every local link, runner stage, test and wiki mapping together |
-| Dated engineering review/download evidence | Historical findings rather than learner instructions | Archive or retain a recoverable revision; preserve provenance and the current validation/rehearsal record |
+## Protect the default branch
 
-Do not remove active setup scripts, shared helpers, SQL baseline tooling, cleanup guards, tests, local checkpoint guides, licenses or attribution merely because a wiki copy exists. `migrate-step6-post-migration.ps1` still supports the manual Module 5 inventory exercise. The repository should remain runnable as a complete checkout or exported package.
+`main` requires pull requests, resolved review conversations and successful `local-checks` and `windows-powershell` checks from GitHub Actions. The branch must be up to date before merging. These requirements apply to administrators; force pushes and branch deletion are disabled.
 
-Any change to scripts, tests or guides changes the rehearsal fingerprint. Finish or preserve an active run before changing revisions; do not edit its state to force a resume. Run the appropriate checks after cleanup and publish a new validated revision for the next class.
+The personal fork has one maintainer, so no second approving reviewer is required. The owner can merge a passing PR. When adding maintainers or transferring to the enterprise account, revisit required approvals and verify that branch protection remains active. If CI job names change, update the required check names at the same time.
 
 ## Release and ownership
 
-Before tagging a course release, complete the [instructor rehearsal](Instructor-Guide.md), record actual timings/package versions, reconcile all failures and optional exercises, and review the [validation record](../review/validation-results.md). Refresh the wiki from that exact revision. Keep private evidence outside the public repository/wiki.
+Before tagging a course release, complete the [instructor rehearsal](Instructor-Guide.md), record actual timings/package versions, reconcile all failures and optional exercises, and confirm the [automated checks](https://github.com/j33pguy/azure-migrate-workshop/actions/workflows/validate.yml) passed for the selected revision. Refresh the wiki from that exact revision. Keep private evidence outside the public repository/wiki.
 
 For the later enterprise transfer, confirm the destination, update repository/wiki links and remotes, and verify both repositories' accessibility and the publication process. Preserve source history, license and notices. See [branding and forking](Branding-and-Forking.md).
