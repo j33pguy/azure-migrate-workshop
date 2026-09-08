@@ -4,6 +4,8 @@
 
 Prepare and verify the environment before participants start discovery. Run Azure commands on your workstation or in PowerShell Cloud Shell. Run Hyper-V commands in an elevated Windows PowerShell session **inside HyperVHost**.
 
+Instructors can use the [rehearsal launcher](Automated-Rehearsal.md) from a persistent Windows workstation to execute scripted stages and record the interactive checkpoints in order. Learners can follow this module manually.
+
 ## 1. Instructor prerequisites
 
 Use a dedicated training subscription or approved training resource groups. Confirm Contributor access for deployment; subscription provider registration and any role assignments require the corresponding permissions. Azure Policy must allow the selected VM size, Standard security, disk export and the outbound download destinations. Select an available region and verify quota; capacity and quota are different constraints.
