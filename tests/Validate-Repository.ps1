@@ -42,9 +42,33 @@ foreach ($name in @('Expand-LabTextTemplate','Assert-LabSourceWorkloads')) {
 }
 Check 'RDP source accepts one IPv4 /32 and rejects wildcard, CIDR /0 and invalid input' {
     Assert-LabAdminSource '203.0.113.14/32'
-    foreach ($bad in @('*','0.0.0.0/0','10.0.0.0/24','999.1.1.1/32','::1/32','0.0.0.0/32','10.0.0.1')) {
+    foreach ($bad in @('*','0.0.0.0/0','10.0.0.0/24','999.1.1.1/32','::1/32','0.0.0.0/32','10.0.0.1',
+        '8.8.2056/32','134744072/32','010.010.010.010/32','0x08.0x08.0x08.0x08/32',' 8.8.8.8/32')) {
         Should-Throw { Assert-LabAdminSource $bad }
     }
+}
+Check 'Workload checks require four distinct literal VM names' {
+    Assert-LabWorkloadNames @('OnPrem-Web','OnPrem-SQL','OnPrem-Linux-Web','OnPrem-Linux-App')
+    foreach ($names in @(
+        @('OnPrem-Web','onprem-web','OnPrem-Linux-Web','OnPrem-Linux-App'),
+        @('OnPrem-*','OnPrem-SQL','OnPrem-Linux-Web','OnPrem-Linux-App'),
+        @('OnPrem-Web','OnPrem-SQL','OnPrem-Linux-Web',' OnPrem-Linux-App'),
+        @('OnPrem-Web','OnPrem-SQL'))) { Should-Throw { Assert-LabWorkloadNames $names } }
+}
+Check 'Incomplete deployment checkout fails before importing Azure modules' {
+    $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
+    $null=New-Item -ItemType Directory -Path "$temp/host" -Force
+    Copy-Item "$root/scripts/deploy-lab.ps1","$root/scripts/common.ps1" $temp
+    $script:cesImports=0
+    function Import-Module { $script:cesImports++; throw 'An Azure module import was reached.' }
+    try {
+        foreach ($content in @($null,'','param( broken syntax')) {
+            if ($null -ne $content) { [IO.File]::WriteAllText("$temp/host/configure-host.ps1",$content) }
+            Should-Throw { & "$temp/deploy-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -AdminUsername labadmin `
+                -AdminPassword (ConvertTo-SecureString 'Sample-Test123!' -AsPlainText -Force) -AdminSourceCidr '203.0.113.14/32' }
+        }
+        if ($script:cesImports -ne 0) { throw 'Deployment advanced past a missing, empty or invalid host script.' }
+    } finally { Remove-Item $temp -Recurse -Force }
 }
 Check 'Remote command requires stdout success marker and no stderr' {
     $good = [pscustomobject]@{Value=@([pscustomobject]@{Code='ComponentStatus/StdOut/succeeded';Message='WORKLOAD_VALIDATED'},[pscustomobject]@{Code='ComponentStatus/StdErr/succeeded';Message=''})}
@@ -183,12 +207,79 @@ Check 'Guest readiness returns one Boolean even when progress is logged' {
 # Mocks: cleanup must never invoke an Azure API in this suite.
 function Get-AzContext { [pscustomobject]@{Subscription=[pscustomobject]@{Id='test-sub'}} }
 $global:cesMockTag='TD-SYNNEX-CES-HyperV'
-function Get-AzResourceGroup { param($Name) [pscustomobject]@{ResourceGroupName=$Name;Tags=@{Workshop=$global:cesMockTag}} }
+$global:cesLookupCalls=0
+$global:cesRestMode='present'
+$global:cesAfterDeleteMode='missing'
+$global:cesDeletedNames=@()
+function Invoke-AzRestMethod {
+    [CmdletBinding()]
+    param($Path,$Method)
+    $global:cesLookupCalls++
+    if ($Method -ne 'GET' -or $Path -notmatch '^/subscriptions/test-sub/resourcegroups/([^?]+)\?api-version=2021-04-01$') {
+        throw 'Unexpected API operation reached the local mock.'
+    }
+    $name=[uri]::UnescapeDataString($Matches[1])
+    $mode=if ($global:cesDeletedNames -contains $name) { $global:cesAfterDeleteMode } else { $global:cesRestMode }
+    switch ($mode) {
+        'transport' { throw 'Synthetic network failure'; }
+        'empty' { return $null }
+        'malformed' { return [pscustomobject]@{StatusCode=404;Content='<html>Proxy failure</html>'} }
+        'present' {
+            $body=@{name=$name;id="/subscriptions/test-sub/resourceGroups/$name";tags=@{Workshop=$global:cesMockTag}}
+            return [pscustomobject]@{StatusCode=200;Content=(ConvertTo-Json $body -Compress)}
+        }
+        'wrongIdentity' {
+            $body=@{name=$name;id="/subscriptions/another-sub/resourceGroups/$name";tags=@{Workshop=$global:cesMockTag}}
+            return [pscustomobject]@{StatusCode=200;Content=(ConvertTo-Json $body -Compress)}
+        }
+        'missing' { $status=404; $code='ResourceGroupNotFound' }
+        'subscriptionMissing' { $status=404; $code='SubscriptionNotFound' }
+        'unauthorized' { $status=401; $code='InvalidAuthenticationToken' }
+        'forbidden' { $status=403; $code='AuthorizationFailed' }
+        'throttled' { $status=429; $code='TooManyRequests' }
+        'serverError' { $status=500; $code='InternalServerError' }
+        default { throw 'Unexpected mock response mode.' }
+    }
+    return [pscustomobject]@{StatusCode=$status;Content=(ConvertTo-Json @{error=@{code=$code}} -Compress)}
+}
 $global:cesMockResources=@()
-function Get-AzResource { param($ResourceGroupName) $global:cesMockResources }
-function Get-AzResourceLock { param($ResourceGroupName) @() }
+$global:cesLateVaultGroup=''
+function Get-AzResource {
+    param($ResourceGroupName)
+    if ($ResourceGroupName -eq $global:cesLateVaultGroup) {
+        [pscustomobject]@{Name='late-vault';ResourceType='Microsoft.RecoveryServices/vaults';ResourceGroupName=$ResourceGroupName}
+    } else { $global:cesMockResources }
+}
+$global:cesMockLocks=@()
+function Get-AzResourceLock { param($ResourceGroupName) $global:cesMockLocks }
 $global:cesDeleteCalls=0
-function Remove-AzResourceGroup { param($Name,[switch]$Force) $global:cesDeleteCalls++; throw 'Unexpected deletion reached mock.' }
+$global:cesAllowMockDelete=$false
+function Remove-AzResourceGroup {
+    param($Name,[switch]$Force)
+    $global:cesDeleteCalls++
+    if (-not $global:cesAllowMockDelete) { throw 'Unexpected deletion reached mock.' }
+    $global:cesDeletedNames += $Name
+}
+Check 'Resource-group absence requires the specific ARM 404 code; other failures stop' {
+    try {
+        $global:cesRestMode='missing'
+        if ($null -ne (Get-LabResourceGroup test-rg -AllowMissing)) { throw 'Expected a verified absent group.' }
+        Should-Throw { Get-LabResourceGroup test-rg }
+        foreach ($mode in @('subscriptionMissing','unauthorized','forbidden','throttled','serverError','transport','malformed','empty','wrongIdentity')) {
+            $global:cesRestMode=$mode
+            Should-Throw { Get-LabResourceGroup test-rg -AllowMissing }
+        }
+        $global:cesRestMode='present'
+        if ((Get-LabResourceGroup 'test-(rg)').ResourceGroupName -ne 'test-(rg)') { throw 'Exact group name was not preserved.' }
+    } finally { $global:cesRestMode='present' }
+}
+Check 'Wildcard and invalid cleanup names are rejected before any Azure lookup' {
+    $callsBefore=$global:cesLookupCalls
+    foreach ($name in @('*','test-*','test-?g','test-[rg]',' test-rg','/subscriptions/test-sub/resourceGroups/test-rg','test-rg.')) {
+        Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg,$name -WhatIf }
+    }
+    if ($global:cesLookupCalls -ne $callsBefore) { throw 'An invalid name reached Azure lookup.' }
+}
 Check 'Subscription mismatch blocks cleanup' {
     Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId wrong-sub -ResourceGroupName test-rg -WhatIf }
 }
@@ -198,13 +289,43 @@ Check 'Untagged resource group blocks cleanup' {
     $global:cesMockTag='TD-SYNNEX-CES-HyperV'
 }
 Check 'Vault blocks cleanup' {
-    $global:cesMockResources=@([pscustomobject]@{Name='vault';ResourceType='Microsoft.RecoveryServices/vaults';ResourceGroupName='test-rg'})
-    Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -WhatIf }
+    foreach ($type in @('Microsoft.RecoveryServices/vaults','Microsoft.DataProtection/backupVaults')) {
+        $global:cesMockResources=@([pscustomobject]@{Name='vault';ResourceType=$type;ResourceGroupName='test-rg'})
+        Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -WhatIf }
+    }
     $global:cesMockResources=@()
+}
+Check 'A vault in the second group or a resource lock blocks every deletion' {
+    try {
+        $global:cesLateVaultGroup='second-rg'
+        Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName first-rg,second-rg -Confirm:$false }
+        $global:cesLateVaultGroup=''
+        $global:cesMockLocks=@([pscustomobject]@{Name='keep-lab'})
+        Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -Confirm:$false }
+        if ($global:cesDeleteCalls -ne 0) { throw 'A deletion was reached before all groups were cleared.' }
+    } finally { $global:cesLateVaultGroup=''; $global:cesMockLocks=@() }
 }
 Check 'WhatIf performs zero resource deletion calls' {
     & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -WhatIf
     if ($global:cesDeleteCalls -ne 0) { throw 'A deletion was attempted.' }
+}
+Check 'Cleanup completion requires verified absence and does not hide post-delete lookup failure' {
+    try {
+        $global:cesAllowMockDelete=$true
+        foreach ($mode in @('forbidden','transport','missing','present')) {
+            $global:cesDeletedNames=@()
+            $global:cesDeleteCalls=0
+            $global:cesAfterDeleteMode=$mode
+            if ($mode -eq 'missing') {
+                & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -Confirm:$false
+            } else {
+                Should-Throw { & "$root/scripts/cleanup-lab.ps1" -SubscriptionId test-sub -ResourceGroupName test-rg -Confirm:$false }
+            }
+            if ($global:cesDeleteCalls -ne 1) { throw 'Expected exactly one simulated deletion attempt.' }
+        }
+    } finally {
+        $global:cesAllowMockDelete=$false; $global:cesDeletedNames=@(); $global:cesDeleteCalls=0; $global:cesAfterDeleteMode='missing'
+    }
 }
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count local checks passed. Azure/Hyper-V execution has not been tested."

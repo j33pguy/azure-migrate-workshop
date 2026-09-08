@@ -14,7 +14,7 @@ Get-AzResource -ResourceGroupName $sourceRg | Select-Object Name,ResourceType,Re
 Get-AzResource -ResourceGroupName $targetRg | Select-Object Name,ResourceType,ResourceId
 ```
 
-The cleanup script only accepts groups tagged `Workshop=TD-SYNNEX-CES-HyperV`. An old lab created by the original scripts lacks this tag. Inspect its entire inventory and use an explicit manual cleanup decision; do not blindly tag an existing group just to bypass the guard.
+The cleanup script only accepts exact group names tagged `Workshop=TD-SYNNEX-CES-HyperV`. Wildcards such as `rg-ces-*`, resource IDs and names containing whitespace are rejected before any group lookup. An old lab created by the original scripts lacks this tag. Inspect its entire inventory and use an explicit manual cleanup decision; do not blindly tag an existing group just to bypass the guard.
 
 ## 2. Remove service-managed state first
 
@@ -25,7 +25,7 @@ The cleanup script only accepts groups tagged `Workshop=TD-SYNNEX-CES-HyperV`. A
 5. Account for restored VM disks and NICs; they can exist outside the original groups.
 6. Confirm any temporary `WinServerBase-temp` disk export is revoked before removing that disk.
 
-A Recovery Services vault can remain billable or block deletion because of retained state. The script refuses any group containing a vault until you handle and remove the vault through its documented procedure. [Delete a Recovery Services vault](https://learn.microsoft.com/azure/backup/backup-azure-delete-vault), [Site Recovery vault cleanup](https://learn.microsoft.com/azure/site-recovery/delete-vault)
+A vault can retain data or block deletion because of protected items. The script refuses groups containing either a Recovery Services vault (`Microsoft.RecoveryServices/vaults`) or a Backup vault (`Microsoft.DataProtection/backupVaults`). Complete the appropriate service procedure first; the script does not remove their protection or retained data. [Delete a Recovery Services vault](https://learn.microsoft.com/azure/backup/backup-azure-delete-vault), [Site Recovery vault cleanup](https://learn.microsoft.com/azure/site-recovery/delete-vault), [delete a Backup vault](https://learn.microsoft.com/en-us/azure/backup/create-manage-backup-vault#delete-a-backup-vault)
 
 ## 3. Preview and delete
 
@@ -38,7 +38,9 @@ A Recovery Services vault can remain billable or block deletion because of retai
     -ResourceGroupName $targetRg,$sourceRg
 ```
 
-The script lists resources and prompts before deleting each group. It checks the subscription, workshop tags, vault presence and locks first. It deliberately has no `-Force` bypass switch. It does not disable Defender plans, remove backup retention, or clear subscription-level policies.
+The script lists resources and prompts before deleting each group. It checks the subscription, workshop tags, vault presence and locks for **every supplied group before deleting the first one**. It deliberately has no `-Force` bypass switch. It does not disable Defender plans, remove backup retention, or clear subscription-level policies.
+
+An expired login, denied read, throttling response or network failure stops cleanup. The script only reports a group deleted after Azure returns the specific `ResourceGroupNotFound` response for that exact group in the selected subscription. If the post-delete lookup fails, inspect the portal and resolve the lookup error; deletion may already have occurred, but has not been verified. Do not interpret a read failure as proof that charges have stopped.
 
 ## 4. Verify completion
 

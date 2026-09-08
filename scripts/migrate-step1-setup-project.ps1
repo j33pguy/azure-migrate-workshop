@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 $null = Assert-LabContext $SubscriptionId
 $null = Assert-LabResourceGroup $SourceResourceGroup
 if ($SourceResourceGroup -eq $TargetResourceGroup) { throw 'Source and target groups must be different.' }
-if (Get-AzResourceGroup -Name $TargetResourceGroup -ErrorAction SilentlyContinue) { throw 'Use a new target resource group. Existing networks will not be overwritten.' }
+if (Get-LabResourceGroup -Name $TargetResourceGroup -AllowMissing) { throw 'Use a new target resource group. Existing networks will not be overwritten.' }
 $tags = @{ Workshop = 'TD-SYNNEX-CES-HyperV'; Team = 'Cloud Enablement Services'; Purpose = 'Training' }
 New-AzResourceGroup -Name $TargetResourceGroup -Location $Location -Tag $tags | Out-Null
 foreach ($network in @(@{Name='target';Prefix='10.1'},@{Name='test';Prefix='10.2'})) {

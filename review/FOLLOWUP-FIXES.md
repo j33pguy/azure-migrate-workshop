@@ -14,6 +14,23 @@ Modules 2 and 3 now describe copying the helper into the source SQL VM, preservi
 
 Validation coverage also now includes a Windows PowerShell 5.1 GitHub Actions job. Linux payload checks call the actual PowerShell renderer instead of duplicating its replacement logic in Python. Documentation checks include every Markdown file under `review`.
 
+## Deployment and cleanup pass
+
+The next pass starts from `a393de4` and corrects these additional issues:
+
+| Gap | Change | Verification |
+|---|---|---|
+| A suppressed resource-group lookup error could be treated as a free group name or a completed deletion | Use the exact ARM resource-group GET; only HTTP 404 with `ResourceGroupNotFound` permits an absent result; validate returned name/subscription identity and tags | Mock responses cover 401, 403, unrelated 404, 429, 500, transport failures, malformed/empty responses and a wrong subscription ID; post-delete failure cannot report verified success |
+| Cleanup accepted name patterns through a wildcard-capable Azure command | Validate every supplied name before lookup; require an exact group identity | Wildcard, whitespace and resource-ID inputs reach no Azure lookup; a vault in the second group blocks all deletion |
+| Backup vaults were not included in the Recovery Services vault guard | Block `Microsoft.DataProtection/backupVaults` as well and link its distinct cleanup procedure | Both vault types and resource locks stop deletion in the local suite |
+| A repeated VM name could satisfy multiple workload-name inputs | Require four distinct literal names and verify each returned VM identity | Case-insensitive duplicates, patterns, whitespace and missing names are rejected |
+| IPAddress.TryParse accepts abbreviated, integer and hexadecimal addresses unsuitable for these explicit CIDR instructions | Require four canonical decimal IPv4 octets before the existing `/32` checks | Abbreviated, integer, hexadecimal, leading-zero and whitespace forms are rejected |
+| The host payload was first read after billable host creation | Read and parse it at the beginning of deployment, then use that validated content for Run Command | A temporary incomplete checkout with missing/empty/broken payload fails before Az module import |
+
+The ARM GET uses [Microsoft's documented resource-group endpoint](https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/get?view=rest-resources-2021-04-01). The [official Get-AzResourceGroup SDK implementation](https://github.com/Azure/azure-powershell/blob/main/src/Resources/ResourceManager/SdkClient/NewResourceManagerSdkClient.cs) inspected during this pass catches CloudException on exact-name reads and emits a generic missing-group error. This is why inspecting that generic message would not safely distinguish absence from failed access.
+
+The suite now contains **22 local checks**. Resource lookups and deletions in the suite are simulated; no real Azure cleanup was performed. These checks are also run in the Windows PowerShell 5.1 CI job.
+
 ## Remaining runtime work
 
 No Azure resources have been created or changed by this follow-up. A read-only Azure account-context check was performed. The source deployment, Windows/Hyper-V operations, appliance installation and internal NAT topology, SQL installer and live SQL connection, replication, migration and real cleanup still require the [instructor rehearsal](../docs/Instructor-Guide.md).

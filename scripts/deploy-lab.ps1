@@ -24,6 +24,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/common.ps1"
+$hostScript = Read-LabHostConfiguration "$PSScriptRoot/host/configure-host.ps1"
 Assert-LabAdminSource $AdminSourceCidr
 foreach ($module in @('Az.Accounts','Az.Resources','Az.Network','Az.Compute')) {
     Import-Module $module -ErrorAction Stop
@@ -37,7 +38,7 @@ $passwordPlain = $credential.GetNetworkCredential().Password
 if ($passwordPlain.Length -lt 12 -or $passwordPlain.Length -gt 72 -or $passwordPlain -match '[\r\n\x00-\x1f]') { throw 'Use a 12-72 character lab password without control characters.' }
 $classes = @('[a-z]','[A-Z]','[0-9]','[^a-zA-Z0-9]') | Where-Object { $passwordPlain -cmatch $_ }
 if (@($classes).Count -lt 3) { throw 'The password must include at least three character categories: lower, upper, number, symbol.' }
-if (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue) { throw 'Use a new, dedicated source resource group. Deployment is not a post-migration repair command.' }
+if (Get-LabResourceGroup -Name $ResourceGroupName -AllowMissing) { throw 'Use a new, dedicated source resource group. Deployment is not a post-migration repair command.' }
 $sku = @(Get-AzComputeResourceSku -Location $Location | Where-Object { $_.ResourceType -eq 'virtualMachines' -and $_.Name -eq $VMSize })
 if ($sku.Count -ne 1 -or @($sku[0].Restrictions | Where-Object Type -EQ 'Location').Count -gt 0) { throw "VM size unavailable for this subscription/region: $VMSize in $Location." }
 $cores = [int]($sku[0].Capabilities | Where-Object Name -EQ 'vCPUs').Value
@@ -103,7 +104,7 @@ Write-Output 'HYPERV_INSTALLED'
     $protected = @(@{ Name = 'AdminPassword'; Value = $passwordPlain }, @{ Name = 'WindowsVhdSasUrl'; Value = $access.AccessSAS })
     $runCreated = $true
     Set-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $vmName -Location $Location -RunCommandName $runName `
-        -SourceScript (Get-Content "$PSScriptRoot/host/configure-host.ps1" -Raw) -Parameter $parameters -ProtectedParameter $protected -TimeoutInSecond 14400 -AsyncExecution | Out-Null
+        -SourceScript $hostScript -Parameter $parameters -ProtectedParameter $protected -TimeoutInSecond 14400 -AsyncExecution | Out-Null
     $deadline = (Get-Date).AddHours(4).AddMinutes(10)
     $view = $null
     do {
