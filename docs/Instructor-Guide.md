@@ -2,7 +2,7 @@
 
 **TD SYNNEX | Cloud Enablement Services**
 
-This is the release gate for partner delivery. The repository has received a static engineering review; a passing syntax check is not an Azure deployment test. Use one clean environment from beginning to end before scheduling a delivery against this version.
+This is the release gate for partner delivery. **Live Azure/Hyper-V rehearsal is pending.** Automated code checks do not prove that deployment or migration works. Use one clean environment from beginning to end before scheduling a delivery against this version.
 
 Use the [rehearsal launcher](Automated-Rehearsal.md) to run the scripted stages and collect checkpoint evidence in order. Its report distinguishes automated passes from instructor-recorded outcomes. Use the table below to retain the full release evidence, including checks that the runner does not automate.
 
@@ -40,19 +40,19 @@ Copy this table into your session notes and replace **Not run** only with record
 | Backup, if included | Successful recovery point and real restore validation, not just backup enablement | Not run |
 | Cleanup | Resource inventory empty or every retained item assigned an owner/deletion date | Not run |
 
-Do not put passwords, project registration keys, SAS URLs or identifiable participant data in screenshots or the public repository. Capture portal screenshots only after this live run. The original repository referenced 46 images that did not exist; this refresh uses written steps and actual expected outcomes instead of fabricated screenshots.
+Do not put passwords, project registration keys, SAS URLs or identifiable participant data in screenshots or the public repository. Capture portal screenshots from the live rehearsal and verify that they match the course revision.
 
 ## Known release dependencies
 
-1. **Live Azure validation:** required for the changed provisioning and migration workflow. No Azure resource has been deployed by the review agent.
+1. **Live Azure validation:** complete every required rehearsal gate above, including in-VM application checks and final cleanup.
 2. **Nested appliance topology:** this lab uses internal NAT/DHCP; Microsoft's production appliance prerequisites describe an external switch. Record the actual installer/discovery result and describe the topology as a training adaptation.
 3. **Online installers:** the Windows image, Ubuntu `current` image and several package feeds move independently of Git. Validate them shortly before delivery and record the resolved versions. The code validates some signatures/hashes but is not a reproducible offline build.
-4. **Original Microsoft source:** the supplied repository's history has one initial commit and does not record a Microsoft parent. Obtain the original source URL before finalizing its full attribution trail.
-5. **Course release:** the fork is owned by [j33pguy](https://github.com/j33pguy/azure-migrate-workshop); the refresh was merged to `main` on September 8, 2026. Record the exact rehearsal commit, fix any failures, and repeat affected gates before tagging a version for partner delivery. See [Branding and forking](Branding-and-Forking.md).
+4. **Original Microsoft source:** obtain the original source URL and applicable notices to complete the attribution trail described in [NOTICE](../NOTICE.md).
+5. **Course release:** record the exact rehearsal commit, fix any failures, and repeat affected gates before tagging a version for partner delivery. See [Branding and forking](Branding-and-Forking.md).
 
 ## Teaching suggestions
 
-Teach the portal first so learners see source selection, provider registration, target settings, test cleanup and planned cutover. The old scripts hid those distinctions behind success messages. The preserved step-guide filenames now print the relevant runbook; they do not claim to automate migration.
+Teach source selection, provider registration, target settings, test cleanup and planned cutover in the portal. The module guides provide the manual sequence; the rehearsal launcher coordinates scripted checks and instructor checkpoints.
 
 Keep Module 4 as a discussion unless separate ASR resources have been prevalidated. For Module 5, explicitly choose whether monitoring and backup/restore are hands-on or demonstrations, and allow their runtime in the agenda. Do not turn on subscription-wide Defender billing as a side effect of checking a lab VM.
 
@@ -62,7 +62,9 @@ Explain that the sample sites and API are standalone. Compare real migration evi
 
 ```powershell
 pwsh -NoProfile -File tests/Validate-Repository.ps1
+pwsh -NoProfile -File tests/Test-Rehearsal.ps1
 python3 tests/check_docs.py
+python3 -m unittest discover -s tests -p 'test_wiki.py'
 ```
 
 For generated Linux/JavaScript payload validation, install the test-only dependency in an isolated Python environment and ensure Node.js and bash are available:
@@ -74,7 +76,7 @@ python3 -m venv .venv
 python3 tests/check_docs.py --external
 ```
 
-On Windows, use the equivalent `.venv\Scripts\python.exe` path and a bash-capable environment for the payload shell checks. The external-link check records HTTP status/redirects; it cannot validate a tenant-specific portal operation or every download in an installer chain.
+On Windows, use the equivalent `.venv\Scripts\python.exe` path and a bash-capable environment for the payload shell checks. The external-link check writes HTTP status/redirects to ignored `.artifacts/external-links.json`; it cannot validate a tenant-specific portal operation or every download in an installer chain.
 
 CI runs the PowerShell checks under Windows PowerShell 5.1 as well as PowerShell 7 on Linux. These jobs use local fixtures/mocks and do not execute the Windows host setup, installers or a real SQL connection. The SQL baseline helper supports Windows PowerShell 5.1 and PowerShell 7.5+; earlier PowerShell 7 versions do not expose the required JSON timestamp-preservation option.
 
@@ -84,6 +86,4 @@ Optional installed-Az metadata check (no authentication or Azure API calls):
 pwsh -NoProfile -File tests/Check-AzParameters.ps1
 ```
 
-This verifies names and explicitly named parameters only. The review used
-Az.Accounts 5.5.3, Az.Compute 11.9.0, Az.Network 8.2.0 and Az.Resources 10.2.0;
-it does not imply that an end-to-end deployment was run with those modules.
+This verifies names and explicitly named parameters against your installed modules only. Record those versions in the rehearsal evidence; metadata checks do not execute an Azure deployment.

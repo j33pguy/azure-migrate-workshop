@@ -6,7 +6,7 @@ Read the course in the [workshop wiki](https://github.com/j33pguy/azure-migrate-
 
 Discover, assess, test and migrate four Hyper-V VMs to Azure, then validate and clean up the environment. All four workloads use the **Hyper-V host replication provider**. The discovery appliance performs assessment; the replication provider on the Hyper-V host moves VM data. SQL Server does not require a different replication architecture simply because it stores data. [Microsoft Hyper-V migration tutorial](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v)
 
-**Release status:** engineering refresh merged to `main` on September 8, 2026; awaiting live rehearsal. Automated Windows and Linux checks pass, but an instructor must complete the [live rehearsal](docs/Instructor-Guide.md) before partner delivery. No Azure deployment or migration was performed during the code review.
+**Release status:** awaiting live Azure/Hyper-V rehearsal. Automated checks run on Windows and Linux; an instructor must complete the [release checklist](docs/Instructor-Guide.md) before partner delivery. Use the [validation workflow](https://github.com/j33pguy/azure-migrate-workshop/actions/workflows/validate.yml) to check results for the exact revision you plan to use.
 
 ## Learning path
 
@@ -16,7 +16,7 @@ Provision the environment before the teaching session. Budget a full working day
 |---|---|---|
 | 0 | [Setup](docs/Module-0-Setup.md) | Five nested VMs; four healthy sample workloads |
 | 1 | [Discovery and assessment](docs/Module-1-Discovery.md) | Four workload names discovered and an Azure VM assessment |
-| 2 | [Hyper-V replication and test migration](docs/Module-2-Agentless-Migration.md) | Successful isolated tests for every workload |
+| 2 | [Hyper-V replication and test migration](docs/Module-2-HyperV-Migration.md) | Successful isolated tests for every workload |
 | 3 | [Cutover and stateful validation](docs/Module-3-Stateful-Migration.md) | Planned migration, SQL data comparison, application acceptance |
 | 4 | [Azure Migrate and Site Recovery](docs/Module-4-ASR-Comparison.md) | Explain migration versus ongoing disaster recovery |
 | 5 | [Post-migration operations](docs/Module-5-Post-Migration.md) | Monitoring evidence, optional backup/restore, cost and security review |
@@ -95,7 +95,6 @@ The deployment scripts require **new, dedicated resource groups**. They intentio
 | `deploy-lab.ps1` | Billable source host, nested guests, DHCP/NAT and samples; protected setup parameters; fails if readiness is not observed |
 | `host/configure-host.ps1` | Runs inside the Windows host; creates the four workloads and the appliance OS VM |
 | `migrate-step1-setup-project.ps1` | Billable target/test network preparation; portal project creation follows |
-| `migrate-step2` through `migrate-step5` | Local guides to the supported Hyper-V portal workflow; no migration automation |
 | `Test-MigratedWorkloads.ps1` | Executes smoke tests inside explicitly named Azure VMs using their VM agents |
 | `Test-LabSqlData.ps1` | Runs inside the SQL VM; captures or compares every defined column of the two sample tables against a preserved source baseline |
 | `migrate-step6-post-migration.ps1` | Read-only VM inventory and Module 5 handoff |
@@ -114,6 +113,6 @@ Follow [Cleanup](docs/Cleanup.md) before running the deletion without `-WhatIf`.
 
 ## Maintenance and provenance
 
-Run `pwsh -NoProfile -File scripts/Start-LabRehearsal.ps1 -Mode Validate` and `python3 tests/check_docs.py` before sharing changes. CI also runs the PowerShell checks with Windows PowerShell 5.1 and exercises Linux HTTP failure handling. See the [review findings](review/REVIEW.md), [September 8 fixes](review/FOLLOWUP-FIXES.md), [instructor checklist](docs/Instructor-Guide.md), and [branding guide](docs/Branding-and-Forking.md).
+Run `pwsh -NoProfile -File scripts/Start-LabRehearsal.ps1 -Mode Validate` and `python3 tests/check_docs.py` before sharing changes. CI also runs the PowerShell checks with Windows PowerShell 5.1 and exercises Linux HTTP failure handling. See the [instructor checklist](docs/Instructor-Guide.md), [repository maintenance guide](docs/Repository-Maintenance.md), and [branding guide](docs/Branding-and-Forking.md).
 
 The supplied source has an [MIT license](LICENSE) attributed to Pamir Erdem. Its GitHub metadata reports a standalone repository; the claimed Microsoft original was not identified. Preserve the existing license and trace the original source before making Microsoft-derived attribution claims. See [NOTICE](NOTICE.md).

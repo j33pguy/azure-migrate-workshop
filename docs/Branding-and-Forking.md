@@ -2,19 +2,19 @@
 
 **TD SYNNEX | Cloud Enablement Services**
 
-The workshop uses TD SYNNEX text branding in the README, learner modules, instructor guide, guide scripts and sample HTML/API pages. No official logo artwork or unprovided brand colors have been invented. Apply the team's approved logo/assets when supplied.
+The workshop uses TD SYNNEX text branding in the README, learner modules, instructor guide, scripts and sample HTML/API pages. Apply the team's approved logo/assets when supplied.
 
 ## Stable technical names
 
 Keep `OnPrem-Web`, `OnPrem-SQL`, `OnPrem-Linux-Web`, `OnPrem-Linux-App`, `MigrateAppl`, `intSwitch`, `ContosoApp`, `Customers`, `Orders`, `/api/health`, and `contoso-app.service` stable unless changing deployment, validation and documentation together. These are technical identifiers or fictional sample names, not the workshop's public brand.
 
-Set workshop resource names through the documented parameters; the lab scripts no longer default to an individual's `nazli-*` groups. If changing the `Workshop=TD-SYNNEX-CES-HyperV` tag, change creation, cleanup guards, tests and documentation together.
+Set workshop resource names through the documented parameters. If changing the `Workshop=TD-SYNNEX-CES-HyperV` tag, change creation, cleanup guards, tests and documentation together.
 
 ## Repository ownership and release
 
 The workshop fork is [j33pguy/azure-migrate-workshop](https://github.com/j33pguy/azure-migrate-workshop), owned in Russ's personal GitHub account for now. A later transfer to the enterprise account is planned; its destination has not been selected. The fork retains the history of [Pamir/azure-migrate-workshop](https://github.com/Pamir/azure-migrate-workshop) and the original [MIT license](../LICENSE).
 
-The refresh was merged into [`main`](https://github.com/j33pguy/azure-migrate-workshop/tree/main) through [PR #1](https://github.com/j33pguy/azure-migrate-workshop/pull/1) on September 8, 2026. The Quick Start now selects `main` for rehearsal and records its exact commit. Merging the engineering changes does not complete the live validation required for partner delivery.
+Use [`main`](https://github.com/j33pguy/azure-migrate-workshop/tree/main) for rehearsal and record its exact commit. Partner delivery requires a revision that has passed the live instructor checklist.
 
 Before releasing a course version:
 

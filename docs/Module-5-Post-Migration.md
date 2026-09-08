@@ -78,7 +78,7 @@ For an interactive private connection, configure an appropriate Bastion option a
 
 For traffic analysis, use **virtual network flow logs**. New NSG flow logs cannot be created after June 30, 2025. [Flow-log transition](https://learn.microsoft.com/azure/network-watcher/network-watcher-nsg-flow-logging-overview), [VNet flow logs](https://learn.microsoft.com/azure/network-watcher/vnet-flow-logs-overview)
 
-Inspect Defender for Cloud recommendations. Enabling a paid Defender for Servers plan at subscription scope affects other resources too. The former script enabled it automatically; this version does not. Plan/feature prerequisites and pricing must be reviewed for the chosen scope. [Defender for Servers overview](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-servers-overview)
+Inspect Defender for Cloud recommendations. Enabling a paid Defender for Servers plan at subscription scope affects other resources too. Review plan/feature prerequisites and pricing for the chosen scope before enabling a plan. [Defender for Servers overview](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-servers-overview)
 
 ## 5. Costs, patching and handover
 
