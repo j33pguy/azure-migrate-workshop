@@ -19,6 +19,9 @@ jobs:
       - run: pwsh -NoProfile -File tests/Validate-Repository.ps1
       - run: pwsh -NoProfile -File tests/Test-Rehearsal.ps1
       - run: python tests/check_docs.py
+      - run: python -m unittest discover -s tests -p test_wiki.py
+      - run: python tools/sync_wiki.py --wiki-dir "$RUNNER_TEMP/wiki-preview" --revision HEAD
+      - run: python tools/sync_wiki.py --wiki-dir "$RUNNER_TEMP/wiki-preview" --revision HEAD --check
       - run: python tests/check_payloads.py
   windows-powershell:
     runs-on: windows-latest
