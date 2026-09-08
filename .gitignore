@@ -13,3 +13,17 @@ Thumbs.db
 
 # Azure credentials - never commit
 *.publishsettings
+
+# Local validation environments and participant evidence
+.venv/
+__pycache__/
+*.VaultCredentials
+*.rdp
+*.bak
+*-session-evidence.*
+*.baseline.json
+rehearsal-evidence/
+*.vhd
+*.vhdx
+*.iso
+*.exe
