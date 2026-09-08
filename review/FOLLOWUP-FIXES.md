@@ -37,4 +37,4 @@ No Azure resources have been created or changed by this follow-up. A read-only A
 
 The baseline helper validates the defined sample-table data; it is not a substitute for backup/restore, full schema comparison or business acceptance testing. PowerShell 5.1 and 7.5+ JSON handling is explicitly supported. Source/target writers must be controlled throughout cutover.
 
-The original Microsoft source and approved branding assets remain external inputs. See [validation results](validation-results.md) for the recorded checks and [draft PR #1](https://github.com/j33pguy/azure-migrate-workshop/pull/1) for the changes.
+The original Microsoft source and approved branding assets remain external inputs. See [validation results](validation-results.md) for the recorded checks and [merged PR #1](https://github.com/j33pguy/azure-migrate-workshop/pull/1) for the changes.
