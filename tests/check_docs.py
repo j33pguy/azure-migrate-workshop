@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--external', action='store_true')
 args = parser.parse_args()
 errors, external = [], set()
-files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md')), ROOT / 'NOTICE.md', *sorted((ROOT / 'review').glob('*.md'))]
+files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md')), ROOT / 'NOTICE.md', *sorted((ROOT / 'review').glob('*.md')), *sorted((ROOT / 'wiki').glob('*.md'))]
 for file in files:
     if not file.exists():
         errors.append(f'Missing document: {file.relative_to(ROOT)}')
