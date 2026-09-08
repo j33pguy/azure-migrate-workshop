@@ -1,0 +1,19 @@
+[
+  {"page": "Home", "source": "wiki/Home.md"},
+  {"page": "Architecture", "source": "README.md", "section": "Environment"},
+  {"page": "Module-0-Setup", "source": "docs/Module-0-Setup.md"},
+  {"page": "Module-1-Discovery", "source": "docs/Module-1-Discovery.md"},
+  {"page": "Module-2-HyperV-Migration", "source": "docs/Module-2-Agentless-Migration.md"},
+  {"page": "Module-3-Stateful-Migration", "source": "docs/Module-3-Stateful-Migration.md"},
+  {"page": "Module-4-ASR-Comparison", "source": "docs/Module-4-ASR-Comparison.md"},
+  {"page": "Module-5-Post-Migration", "source": "docs/Module-5-Post-Migration.md"},
+  {"page": "Automated-Rehearsal", "source": "docs/Automated-Rehearsal.md"},
+  {"page": "Instructor-Guide", "source": "docs/Instructor-Guide.md"},
+  {"page": "Troubleshooting", "source": "docs/Troubleshooting.md"},
+  {"page": "Cleanup", "source": "docs/Cleanup.md"},
+  {"page": "Release-Validation", "source": "review/validation-results.md"},
+  {"page": "Branding-and-Forking", "source": "docs/Branding-and-Forking.md"},
+  {"page": "Repository-Maintenance", "source": "docs/Repository-Maintenance.md"},
+  {"page": "_Sidebar", "source": "wiki/_Sidebar.md"},
+  {"page": "_Footer", "source": "wiki/_Footer.md"}
+]
