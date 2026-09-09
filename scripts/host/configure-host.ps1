@@ -9,6 +9,7 @@ param(
 try {
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+# LAB_HEALTH_HELPERS
 
 # ---------- Logging ----------
 $labRoot = "C:\AzMigrateLab"
@@ -26,6 +27,13 @@ function Write-Log {
     $entry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message"
     Write-Host $entry
     Add-Content -Path $logFile -Value $entry -ErrorAction SilentlyContinue
+    $stage = switch -Regex ($Message) {
+        '^PHASE 1:' { 'network'; break }; '^PHASE 2:' { 'images'; break }
+        '^PHASE 3:' { 'guests'; break }; '^PHASE 4:' { 'boot'; break }
+        '^PHASE 5:' { 'workloads'; break }; '^--- Configuring OnPrem-Web' { 'iis'; break }
+        '^--- Configuring OnPrem-SQL' { 'sql'; break }; '^Validating sample applications' { 'validation'; break }
+    }
+    if ($stage) { Write-Host "LAB_STAGE|$stage" }
 }
 
 function Expand-LabTextTemplate {
@@ -130,11 +138,11 @@ if (-not (Test-Path $oscdimgPath)) {
     Write-Log "Installing Windows ADK Deployment Tools (for oscdimg)..."
     $adkInstaller = "$labRoot\adksetup.exe"
     $adkUrl = "https://go.microsoft.com/fwlink/?linkid=2243390"
-    Invoke-WebRequest -Uri $adkUrl -OutFile $adkInstaller -UseBasicParsing -ErrorAction Stop
+    Invoke-WebRequest -Uri $adkUrl -OutFile $adkInstaller -UseBasicParsing -ErrorAction Stop -TimeoutSec 300
     $signature = Get-AuthenticodeSignature $adkInstaller
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'ADK signature validation failed.' }
-    $process = Start-Process -FilePath $adkInstaller -ArgumentList "/quiet /norestart /features OptionId.DeploymentTools" -Wait -PassThru -ErrorAction Stop
-    if ($process.ExitCode -notin @(0,3010) -or -not (Test-Path $oscdimgPath)) { throw 'ADK Deployment Tools installation failed.' }
+    Invoke-LabProcess -FilePath $adkInstaller -Arguments '/quiet /norestart /features OptionId.DeploymentTools' -Stage 'Install ADK' -LogDirectory $labRoot -TimeoutSeconds 3600 -SuccessCodes @(0,3010)
+    if (-not (Test-Path $oscdimgPath)) { throw 'ADK Deployment Tools installation failed.' }
     Write-Log "Windows ADK Deployment Tools installed."
 } else {
     Write-Log "Windows ADK Deployment Tools already installed."
@@ -158,10 +166,14 @@ if (-not $qemuImg -or -not (Test-Path $qemuImg)) {
     if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        $bootstrap = Join-Path $labRoot 'install-chocolatey.ps1'
+        Invoke-WebRequest 'https://community.chocolatey.org/install.ps1' -OutFile $bootstrap -UseBasicParsing -TimeoutSec 300 -ErrorAction Stop
+        Invoke-LabProcess -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+            -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$bootstrap`"" -Stage 'Install Chocolatey' -LogDirectory $labRoot -TimeoutSeconds 1800
     }
-    choco install qemu --no-progress -y | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "QEMU installation failed." }
+    $chocoCommand = Get-Command choco -ErrorAction SilentlyContinue
+    $chocoPath = if ($chocoCommand) { $chocoCommand.Source } else { "$env:ProgramData\chocolatey\bin\choco.exe" }
+    Invoke-LabProcess -FilePath $chocoPath -Arguments 'install qemu --no-progress -y' -Stage 'Install QEMU' -LogDirectory $labRoot -TimeoutSeconds 1800
     $qemuImg = (Get-ChildItem "C:\Program Files\qemu" -Filter "qemu-img.exe" -ErrorAction SilentlyContinue | Select-Object -First 1) | Select-Object -ExpandProperty FullName
     if (-not $qemuImg) {
         $qemuImg = (Get-ChildItem "C:\ProgramData\chocolatey" -Recurse -Filter "qemu-img.exe" -ErrorAction SilentlyContinue | Select-Object -First 1) | Select-Object -ExpandProperty FullName
@@ -176,14 +188,9 @@ if (-not (Test-Path $ubuntuBaseVhd)) {
     if (Test-Path $ubuntuQcow2) { Remove-Item $ubuntuQcow2 -Force }
     if (-not (Test-Path $ubuntuQcow2)) {
         Write-Log "Downloading Ubuntu 22.04 cloud image (QCOW2 format, ~600MB)..."
-        try {
-            Start-BitsTransfer -Source $ubuntuCloudUrl -Destination $ubuntuQcow2 -ErrorAction Stop
-        } catch {
-            Write-Log "BITS transfer failed, falling back to Invoke-WebRequest..."
-            Invoke-WebRequest -Uri $ubuntuCloudUrl -OutFile $ubuntuQcow2 -UseBasicParsing -ErrorAction Stop
-        }
+        Invoke-LabDownload -Uri $ubuntuCloudUrl -Destination $ubuntuQcow2 -Stage 'Download Ubuntu image'
         $hashPath = "$vhdPath\SHA256SUMS"
-        Invoke-WebRequest -Uri 'https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS' -OutFile $hashPath -UseBasicParsing
+        Invoke-WebRequest -Uri 'https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS' -OutFile $hashPath -UseBasicParsing -TimeoutSec 300
         $hashLine = Get-Content $hashPath | Where-Object { $_ -match ' [ *]?jammy-server-cloudimg-amd64.img$' }
         if (@($hashLine).Count -ne 1) { throw 'Cannot identify Ubuntu image checksum; retry if the current image changed.' }
         $expectedHash = ($hashLine -split '\s+')[0]
@@ -193,10 +200,7 @@ if (-not (Test-Path $ubuntuBaseVhd)) {
 
     # Convert QCOW2 to VHDX using qemu-img
     Write-Log "Converting Ubuntu QCOW2 to VHDX (this may take a few minutes)..."
-    & $qemuImg convert -f qcow2 -O vhdx -o subformat=dynamic "$ubuntuQcow2" "$ubuntuBaseVhd" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "qemu-img conversion failed with exit code $LASTEXITCODE"
-    }
+    Invoke-LabProcess -FilePath $qemuImg -Arguments "convert -f qcow2 -O vhdx -o subformat=dynamic `"$ubuntuQcow2`" `"$ubuntuBaseVhd`"" -Stage 'Convert Ubuntu image' -LogDirectory $labRoot -TimeoutSeconds 1800
     # Remove sparse file attribute (required by Hyper-V for differencing disks)
     fsutil sparse setflag "$ubuntuBaseVhd" 0
     Write-Log "Ubuntu base VHDX created."
@@ -222,20 +226,20 @@ if (-not (Test-Path $windowsBaseVhd)) {
         $azcopy = (Get-ChildItem "$labRoot\azcopy" -Recurse -Filter "azcopy.exe" -ErrorAction SilentlyContinue | Select-Object -First 1) | Select-Object -ExpandProperty FullName
         if (-not $azcopy) {
             Write-Log "Installing azcopy..."
-            Invoke-WebRequest -Uri "https://aka.ms/downloadazcopy-v10-windows" -OutFile "$labRoot\azcopy.zip" -UseBasicParsing -ErrorAction Stop
+            Invoke-WebRequest -Uri "https://aka.ms/downloadazcopy-v10-windows" -OutFile "$labRoot\azcopy.zip" -UseBasicParsing -ErrorAction Stop -TimeoutSec 300
             Expand-Archive -Path "$labRoot\azcopy.zip" -DestinationPath "$labRoot\azcopy" -Force
             $azcopy = (Get-ChildItem "$labRoot\azcopy" -Recurse -Filter "azcopy.exe" | Select-Object -First 1) | Select-Object -ExpandProperty FullName
             Write-Log "azcopy installed at: $azcopy"
         }
-            & $azcopy copy $windowsVhdSasUrl $windowsVhdTemp --check-md5 NoCheck --log-level NONE --output-level quiet
-        if ($LASTEXITCODE -ne 0) { Remove-Item $windowsVhdTemp -Force -ErrorAction SilentlyContinue; throw 'Windows disk download failed.' }
+        Invoke-LabProcess -FilePath $azcopy -Arguments "copy `"$windowsVhdSasUrl`" `"$windowsVhdTemp`" --check-md5 NoCheck --log-level NONE --output-level quiet" -Stage 'Download Windows image' -LogDirectory $labRoot -TimeoutSeconds 5400
         if (-not (Test-Path $windowsVhdTemp) -or (Get-Item $windowsVhdTemp).Length -lt 1GB) {
             throw "azcopy download failed or file is too small."
         }
         Write-Log "Windows Server VHD downloaded ($([math]::Round((Get-Item $windowsVhdTemp).Length/1GB, 1)) GB)."
     }
 
-    Convert-VHD -Path $windowsVhdTemp -DestinationPath $windowsBaseVhd -VHDType Dynamic -ErrorAction Stop
+    $job = Convert-VHD -Path $windowsVhdTemp -DestinationPath $windowsBaseVhd -VHDType Dynamic -AsJob -ErrorAction Stop
+    $null = Wait-LabJob $job 'Convert Windows image' -TimeoutSeconds 1800
     Write-Log 'Windows Server base VHDX created.'
 
     # Cleanup temp VHD
@@ -263,7 +267,8 @@ function Create-WindowsGuestVM {
 
     $vmVhdPath = "$vhdPath\$VMName.vhdx"
     if (-not (Test-Path $vmVhdPath)) {
-        Convert-VHD -Path $windowsBaseVhd -DestinationPath $vmVhdPath -VHDType Dynamic -ErrorAction Stop
+        $job = Convert-VHD -Path $windowsBaseVhd -DestinationPath $vmVhdPath -VHDType Dynamic -AsJob -ErrorAction Stop
+        $null = Wait-LabJob $job "Create $VMName disk" -TimeoutSeconds 1800
         Resize-VHD -Path $vmVhdPath -SizeBytes ($DiskGB * 1GB)
     }
 
@@ -361,7 +366,8 @@ function Create-LinuxGuestVM {
 
     $vmVhdPath = "$vhdPath\$VMName.vhdx"
     if (-not (Test-Path $vmVhdPath)) {
-        Convert-VHD -Path $ubuntuBaseVhd -DestinationPath $vmVhdPath -VHDType Dynamic -ErrorAction Stop
+        $job = Convert-VHD -Path $ubuntuBaseVhd -DestinationPath $vmVhdPath -VHDType Dynamic -AsJob -ErrorAction Stop
+        $null = Wait-LabJob $job "Create $VMName disk" -TimeoutSeconds 1800
     }
 
     # Resize the standalone disk so cloud-init has room
@@ -650,8 +656,7 @@ foreach ($vm in $allVMs) {
     }
 }
 
-Write-Log "Waiting 180 seconds for VMs to boot and complete first-boot setup..."
-Start-Sleep -Seconds 180
+Write-Log 'Checking guest first boot immediately; readiness still requires heartbeat and Windows sign-in.'
 
 # --- Wait helper ---
 function Wait-ForGuestVM {
@@ -659,10 +664,16 @@ function Wait-ForGuestVM {
     Write-Log "Waiting for '$VMName' heartbeat..."
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
+        $guest = Get-VM -Name $VMName -ErrorAction Stop
+        if ([string]$guest.State -match 'Critical|Paused|Saved|Off') { throw "Guest $VMName is $($guest.State). Inspect its console and Hyper-V events." }
+        Write-Log "Guest '$VMName': $($guest.State); waiting for heartbeat and management readiness."
         $hb = Get-VMIntegrationService -VMName $VMName -Name "Heartbeat" -ErrorAction SilentlyContinue
         if ($hb -and $hb.PrimaryStatusDescription -eq "OK") {
             if ($VMName -notlike '*Linux*') {
-                try { $null = Invoke-Command -VMName $VMName -Credential $winCred -ScriptBlock { $env:COMPUTERNAME } -ErrorAction Stop }
+                try {
+                    $job = Invoke-Command -VMName $VMName -Credential $winCred -ScriptBlock { $env:COMPUTERNAME } -AsJob -ErrorAction Stop
+                    $null = Wait-LabJob $job "Sign in to $VMName" -TimeoutSeconds 60
+                }
                 catch { Start-Sleep -Seconds 10; continue }
             }
             Write-Log "'$VMName' is responding."
@@ -700,7 +711,7 @@ Write-Log "--- Configuring OnPrem-Web (192.168.0.10) ---"
 try {
     if (-not (Wait-ForGuestVM -VMName "OnPrem-Web")) { throw "Windows web guest not ready." }
 
-    Invoke-Command -VMName "OnPrem-Web" -Credential $winCred -ScriptBlock {
+    $workloadJob = Invoke-Command -VMName "OnPrem-Web" -Credential $winCred -AsJob -ScriptBlock {
         $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -750,6 +761,7 @@ Set-StrictMode -Version Latest
         Write-Output "IIS and sample website deployed on OnPrem-Web."
     } -ErrorAction Stop
 
+    $null = Wait-LabJob $workloadJob 'Install IIS sample' -TimeoutSeconds 1800
     Write-Log "OnPrem-Web configured successfully."
 } catch {
     throw "OnPrem-Web workload setup failed: $_"
@@ -760,7 +772,7 @@ Write-Log "--- Configuring OnPrem-SQL (192.168.0.11) ---"
 try {
     if (-not (Wait-ForGuestVM -VMName "OnPrem-SQL")) { throw "SQL guest not ready." }
 
-    Invoke-Command -VMName "OnPrem-SQL" -Credential $winCred -ScriptBlock {
+    $workloadJob = Invoke-Command -VMName "OnPrem-SQL" -Credential $winCred -AsJob -ScriptBlock {
         $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -775,11 +787,16 @@ Set-StrictMode -Version Latest
         if (-not $sqlService) {
             Write-Output "Downloading SQL Server 2022 Express installer..."
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $sqlSseiUrl -OutFile $sqlSsei -UseBasicParsing -ErrorAction Stop
+            Invoke-WebRequest -Uri $sqlSseiUrl -OutFile $sqlSsei -UseBasicParsing -ErrorAction Stop -TimeoutSec 300
 
             $signature = Get-AuthenticodeSignature $sqlSsei
             if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'SQL installer signature is invalid.' }
-            $install = Start-Process -FilePath $sqlSsei -ArgumentList '/ACTION=Install /QUIET /IACCEPTSQLSERVERLICENSETERMS' -Wait -PassThru
+            $install = Start-Process -FilePath $sqlSsei -ArgumentList '/ACTION=Install /QUIET /IACCEPTSQLSERVERLICENSETERMS' -PassThru
+            $null = $install.Handle
+            if (-not $install.WaitForExit(3600000)) {
+                & taskkill.exe /PID $install.Id /T /F 2>&1 | Out-Null
+                throw 'SQL Express installation exceeded 60 minutes. Inspect SQL Setup Bootstrap logs before retrying.'
+            }
             if ($install.ExitCode -notin @(0,3010)) { throw "SQL Express installer failed: $($install.ExitCode)" }
             if (-not (Get-Service 'MSSQL$SQLEXPRESS' -ErrorAction SilentlyContinue)) { throw 'SQLEXPRESS service not found after installation.' }
         } else {
@@ -814,12 +831,14 @@ Set-StrictMode -Version Latest
         }
     } -ErrorAction Stop
 
+    $null = Wait-LabJob $workloadJob 'Install SQL sample' -TimeoutSeconds 4500
     Write-Log "OnPrem-SQL configured successfully."
 } catch {
     throw "OnPrem-SQL workload setup failed: $_"
 }
 
 # Workload success must be observed, not inferred from VM heartbeat.
+Write-Log 'Validating sample applications...'
 $deadline = (Get-Date).AddMinutes(20)
 $healthy = $false
 while ((Get-Date) -lt $deadline) {
@@ -827,7 +846,7 @@ while ((Get-Date) -lt $deadline) {
         Assert-LabSourceWorkloads
         $healthy = $true
         break
-    } catch { Start-Sleep -Seconds 20 }
+    } catch { Write-Log "Application readiness pending: $($_.Exception.Message)"; Start-Sleep -Seconds 20 }
 }
 if (-not $healthy) { throw 'Workload readiness timed out. Check guest services and cloud-init logs; setup is incomplete.' }
 # Delete Windows setup password material after successful first boot.
