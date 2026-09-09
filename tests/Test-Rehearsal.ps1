@@ -399,3 +399,6 @@ if (-not $WhatIfPreference -and -not $global:cesRehearsalRetainGroup) { $global:
 } finally { Remove-Item -LiteralPath $suite -Recurse -Force }
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count rehearsal checks passed using simulated Azure adapters. No Azure deployment or migration was performed."
+# Expected failed/paused launcher invocations set LASTEXITCODE. Report the suite
+# result explicitly so CI does not inherit a deliberately tested nonzero status.
+exit 0
