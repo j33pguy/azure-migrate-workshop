@@ -37,8 +37,18 @@ function Get-RehearsalPlan {
     }
 }
 
+function Resolve-RehearsalFileSystemPath {
+    param([Parameter(Mandatory)][string]$Path)
+    $provider=$null; $drive=$null
+    try { $resolved=$ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path,[ref]$provider,[ref]$drive) }
+    catch { throw "Cannot resolve workshop path '$Path'. Use a valid filesystem path on this workstation. $($_.Exception.Message)" }
+    if ($provider.Name -ne 'FileSystem') { throw "Workshop path '$Path' must use the filesystem, not the $($provider.Name) provider." }
+    return $resolved
+}
+
 function Read-RehearsalJson {
     param([string]$Path)
+    $Path=Resolve-RehearsalFileSystemPath $Path
     $json = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
     if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { return ConvertFrom-Json -InputObject $json -DateKind String }
     return ConvertFrom-Json -InputObject $json
@@ -46,6 +56,8 @@ function Read-RehearsalJson {
 
 function Write-RehearsalJson {
     param([string]$Path, $Value)
+    $Path=Resolve-RehearsalFileSystemPath $Path
+    $null=[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path))
     $temporary = "$Path.$([guid]::NewGuid().ToString('N')).tmp"
     try {
         [IO.File]::WriteAllText($temporary, ($Value | ConvertTo-Json -Depth 30), [Text.UTF8Encoding]::new($false))
@@ -56,6 +68,10 @@ function Write-RehearsalJson {
 
 function Read-RehearsalConfiguration {
     param([string]$Path)
+    $Path=Resolve-RehearsalFileSystemPath $Path
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Settings file not found: '$Path'. Start with -Mode Run -Interactive to create it, or copy rehearsal.example.json to this path and fill in the settings."
+    }
     $config = Read-RehearsalJson $Path
     $required = @('SubscriptionId','TenantId','Location','SourceResourceGroup','TargetResourceGroup','AdminUsername','AdminSourceCidr','VMSize')
     if ($null -eq $config -or @($config.PSObject.Properties).Count -ne $required.Count) { throw 'Use the exact rehearsal.example.json fields; do not store credentials or extra settings in this file.' }
@@ -81,7 +97,7 @@ function Get-RehearsalFingerprint {
     $entries = @()
     foreach ($property in ($Config.PSObject.Properties | Sort-Object Name)) { $entries += "$($property.Name)=$($property.Value)" }
     foreach ($directory in @('scripts','tests','docs')) {
-        foreach ($file in (Get-ChildItem (Join-Path $Root $directory) -Recurse -File | Where-Object { $_.Extension -in @('.ps1','.py','.md','.txt') } | Sort-Object FullName)) {
+        foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $Root $directory) -Recurse -File -ErrorAction Stop | Where-Object { $_.Extension -in @('.ps1','.py','.md','.txt') } | Sort-Object FullName)) {
             $relative = $file.FullName.Substring($Root.TrimEnd('/','\').Length).Replace('\','/')
             $entries += "$relative=$((Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash)"
         }
@@ -200,7 +216,8 @@ function Assert-RehearsalState {
 
 function Invoke-RehearsalEngine {
     param([string]$Root,$Config,[string]$Directory,[switch]$Interactive,[switch]$ApproveProvisioning,[switch]$ApproveCleanup,[switch]$RetryFailed,[SecureString]$AdminPassword)
-    $Directory=[IO.Path]::GetFullPath($Directory)
+    $Root=Resolve-RehearsalFileSystemPath $Root
+    $Directory=Resolve-RehearsalFileSystemPath $Directory
     $null=New-Item -ItemType Directory -Path $Directory -Force
     # Keep the lock file: unlinking it after closing would allow a second owner.
     $lock=$null

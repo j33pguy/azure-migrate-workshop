@@ -10,7 +10,7 @@ Microsoft documents interactive appliance configuration/sign-in and a Hyper-V ho
 
 ## First launch
 
-1. Use a complete, reviewed checkout on a persistent Windows workstation with Windows PowerShell 5.1 and the Az modules installed as described in [Module 0](Module-0-Setup.md). Keep this workstation available throughout the rehearsal. Python, bash and Node.js are used by the separate development checks/CI; the launcher does not require them.
+1. Use a complete, reviewed checkout on a persistent Windows workstation with Windows PowerShell 5.1 and the Az modules installed as described in [Module 0](Module-0-Setup.md). If downloading a ZIP, extract the entire archive first. Open the extracted folder containing `Start-Rehearsal.cmd`, `scripts`, `tests`, `docs` and `rehearsal.example.json`; keep that layout together. Keep this workstation available throughout the rehearsal. Python, bash and Node.js are used by the separate development checks/CI; the launcher does not require them.
 2. Choose two new dedicated resource-group names, the real tenant/subscription IDs, region, current public IPv4 `/32` and a lab administrator name. The launcher saves these settings in `rehearsal.local.json`, which Git ignores. You can instead copy [rehearsal.example.json](../rehearsal.example.json) to that filename and edit it. Replace both zero GUIDs and the IP placeholder.
 3. Double-click the launcher. If local execution policy or downloaded-file protection blocks it, review the files and use your organization's approved trust/unblock process. The launcher does not bypass execution policy or install dependencies automatically.
 4. Sign in to the configured tenant/subscription when prompted. Automatic preflight checks your selected host size's regional restrictions, CPU/RAM, x64/Gen2/Premium SSD support, host/family vCPU quotas, both Windows images, provider registration and unused group names. Confirm nested virtualization support for that series from Microsoft documentation at the environment checkpoint, along with policy, target/test capacity, licensing, costs, alerts and download access. See [host selection](Module-0-Setup.md).
@@ -74,6 +74,8 @@ Cleanup has separate approval after the service-cleanup checkpoint and preview. 
 
 ## PowerShell entry point
 
+Run these relative commands from the extracted workshop folder. The launcher builds default settings and evidence paths from its own script folder after startup, including under Windows PowerShell 5.1. It prints the resolved settings and results paths when running. Explicit relative `-ConfigPath` and `-RunDirectory` values follow your current PowerShell folder; absolute paths work from any folder. A new settings subfolder is created when interactive setup saves the file. `Status` requires an existing run.
+
 Preview and local tests make no Azure calls:
 
 ```powershell
@@ -94,6 +96,17 @@ For a separate run, use a new settings file with new group names and a new direc
 .\scripts\Start-LabRehearsal.ps1 -Mode Run -Interactive `
     -ConfigPath .\rehearsal.local.json -RunDirectory .\rehearsal-evidence\run-02
 ```
+
+If an older checkout fails at line 12 with `Split-Path` and an empty `Path`, both default parameter expressions must be avoided. From the workshop folder, use this temporary workaround with explicit absolute paths:
+
+```powershell
+$workshop = (Get-Location).Path
+& (Join-Path $workshop 'scripts/Start-LabRehearsal.ps1') -Mode Run -Interactive `
+    -ConfigPath (Join-Path $workshop 'rehearsal.local.json') `
+    -RunDirectory (Join-Path $workshop 'rehearsal-evidence/current')
+```
+
+Use the corrected complete checkout for a new rehearsal. Preserve an existing run's pinned files and evidence as described in [failure recovery](#resume-and-failure-recovery).
 
 Without `-Interactive`, missing evidence or approval returns exit code **2**. Failures/uncertain results return **1**; completed runs return **0**. Batch callers can explicitly supply `-ApproveProvisioning`, a SecureString `-AdminPassword`, `-RetryFailed`, or separately `-ApproveCleanup`. Approval switches are not stored in state. Supplying them does not satisfy missing manual evidence or turn this into an unattended migration.
 
