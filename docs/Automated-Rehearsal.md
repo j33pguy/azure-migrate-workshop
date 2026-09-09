@@ -64,7 +64,23 @@ Network checks inspect each actual VM/NIC and require the expected test or final
 
 ## Progress during deployment
 
-Source deployment and target/test network creation print the current operation, elapsed time and its limit about every 30 seconds. During guest setup the monitor reads Azure's reported execution state and the last available host phase. A process marked `Running` is still awaiting completion; it is not an application health pass. Azure can delay output and status responses, so the display is not a guaranteed real-time heartbeat.
+In an interactive PowerShell console, deployment updates one progress pane in place. Its elapsed timer refreshes about once a second between status checks; Azure status is still checked about every 30 seconds. A slow Azure response can pause the display. It shows the current numbered step, operation, elapsed time and time limit. Source deployment has 12 steps; target/test network creation has nine. Step counts describe the sequence, not how much time remains. Azure operations and installers with no measurable completion percentage stay indeterminate; a displayed time limit is a deadline, never an estimated finish time.
+
+Operation changes and results remain in the console history. Running messages use cyan, completion uses green, warnings or unavailable status use yellow, and failures or `NeedsReview` use red. Every message also has a written status, so color is optional. During guest setup, the pane shows the last reported host phase or installer step. Installer updates include their host timestamp; this timestamp does not advance during a local redraw. Ubuntu download progress can include a measured percentage when the total byte count is available; Windows image downloads and SQL installation do not report a measured percentage. Azure may buffer output or delay status responses, so the last reported phase is not a guaranteed live heartbeat. `Running` still means awaiting completion, not an application health pass.
+
+Redirected output, CI and hosts without an interactive console keep periodic plain-text updates. To use that format yourself, set the option in PowerShell before starting the launcher:
+
+```powershell
+$env:CES_LAB_PROGRESS = 'plain'
+.\Start-Rehearsal.cmd
+```
+
+Setting `NO_COLOR` disables message colors. To preview the display locally, run the [progress demo](../scripts/Show-LabProgressDemo.ps1); its steps and timings are simulated and it makes no Azure calls:
+
+```powershell
+powershell -NoProfile -File .\scripts\Show-LabProgressDemo.ps1
+# Or use pwsh in PowerShell 7.
+```
 
 The latest credential-free summary is `artifacts/deployment-health.json` inside the rehearsal results directory. Read it while the main window is busy:
 

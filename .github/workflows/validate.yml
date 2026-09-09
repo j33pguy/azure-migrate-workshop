@@ -33,3 +33,6 @@ jobs:
       - name: Validate rehearsal orchestration with Windows PowerShell 5.1
         shell: powershell
         run: .\tests\Test-Rehearsal.ps1
+      - name: Validate installation display with PowerShell 7 on Windows
+        shell: pwsh
+        run: .\tests\Test-InstallProgress.ps1

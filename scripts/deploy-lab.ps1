@@ -35,6 +35,11 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/common.ps1"
 $hostScript = Read-LabHostConfiguration "$PSScriptRoot/host/configure-host.ps1"
 . "$PSScriptRoot/health.ps1"
+Initialize-LabProgress -Activity 'TD SYNNEX | Hyper-V deployment' -Steps @(
+    'Source deployment', 'Create source network', 'Create host public IP', 'Create host firewall rules',
+    'Create host network interface', 'Create Azure host', 'Install Hyper-V and DHCP', 'Restart Azure host',
+    'Check Hyper-V readiness', 'Create guest image disk', 'Submit guest setup', 'Guest setup'
+)
 if (-not $HealthPath) { $HealthPath = Join-Path $PSScriptRoot "../.artifacts/deployment-health-$ResourceGroupName.json" }
 Assert-LabAdminSource $AdminSourceCidr
 Assert-LabHostSizeName $VMSize
@@ -103,6 +108,7 @@ Write-Output 'HYPERV_INSTALLED'
     $job = Restart-AzVM -ResourceGroupName $ResourceGroupName -Name $vmName -AsJob
     $null = Wait-LabJob $job 'Restart Azure host' -TimeoutSeconds 900 -HealthPath $HealthPath
     $ready = $false
+    $readinessClock = [Diagnostics.Stopwatch]::StartNew()
     $deadline = (Get-Date).AddMinutes(15)
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 20
@@ -111,7 +117,9 @@ Write-Output 'HYPERV_INSTALLED'
             $probe = Wait-LabJob $job 'Check Hyper-V readiness' -TimeoutSeconds 120 -HealthPath $HealthPath
             $null = Assert-LabRunResult $probe 'HYPERV_READY'
             $ready = $true; break
-        } catch { Write-Host 'Waiting for the VM agent and Hyper-V service...' }
+        } catch {
+            Write-LabHealth 'Check Hyper-V readiness' Warning $readinessClock.Elapsed.TotalSeconds 'VM agent and Hyper-V service are not ready; retrying within the readiness limit.' $HealthPath -TimeoutSeconds 900
+        }
     }
     if (-not $ready) { throw 'Hyper-V host did not become ready.' }
     $job = New-AzDisk -ResourceGroupName $ResourceGroupName -DiskName $diskName -Disk $guestDiskConfig -AsJob
@@ -140,6 +148,7 @@ Write-Output 'HYPERV_INSTALLED'
     } catch { Write-Warning 'Could not update the local health summary. Preserve the terminal error and inspect Azure directly.' }
     throw
 } finally {
+    Complete-LabProgress
     $passwordPlain = $null
     $protected = $null
     if ($diskCreated -and (-not $runCreated -or $setupObservation.Terminal)) {

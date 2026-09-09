@@ -498,5 +498,8 @@ Check 'Cleanup completion requires verified absence and does not hide post-delet
 Check 'Deployment health monitoring handles failure timeout recovery and protected output' {
     & "$PSScriptRoot/Test-DeploymentHealth.ps1"
 }
+Check 'Installation display preserves progress status warnings and plain logs' {
+    & "$PSScriptRoot/Test-InstallProgress.ps1"
+}
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count local checks passed. Azure/Hyper-V execution has not been tested."

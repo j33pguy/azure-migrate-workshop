@@ -10,6 +10,7 @@ try {
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 # LAB_HEALTH_HELPERS
+Initialize-LabProgress -Mode Plain -EmitMarkers
 
 # ---------- Logging ----------
 $labRoot = "C:\AzMigrateLab"
