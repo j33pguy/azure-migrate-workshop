@@ -50,6 +50,29 @@ function Start-Process { param($FilePath) }
     Write-RehearsalJson (Join-Path $directory 'rehearsal.local.json') $config
     return $directory
 }
+function Invoke-StartupBatchFixture {
+    param([string]$Path,[string]$WorkingDirectory)
+    # Pass an exact command line to cmd.exe, avoiding Windows PowerShell's
+    # native-argument quote rewriting for paths with spaces and brackets.
+    $info=[Diagnostics.ProcessStartInfo]::new()
+    $info.FileName=$env:ComSpec
+    $info.Arguments='/d /s /c ""{0}""' -f $Path
+    $info.WorkingDirectory=$WorkingDirectory
+    $info.UseShellExecute=$false
+    $info.RedirectStandardInput=$true
+    $info.RedirectStandardOutput=$true
+    $info.RedirectStandardError=$true
+    $process=[Diagnostics.Process]::new()
+    $process.StartInfo=$info
+    try {
+        $null=$process.Start()
+        $process.StandardInput.Close() # Let the launcher's final pause return.
+        $stdout=$process.StandardOutput.ReadToEndAsync()
+        $stderr=$process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Batch startup test timed out.' }
+        return [pscustomobject]@{ExitCode=$process.ExitCode;Output=($stdout.GetAwaiter().GetResult()+$stderr.GetAwaiter().GetResult())}
+    } finally { $process.Dispose() }
+}
 function Invoke-RehearsalAction {
     param($Id,$Root,$Config,$State,$Directory,$AdminPassword,[switch]$Interactive)
     $script:calls.Add($Id)
@@ -143,16 +166,13 @@ try {
     if ($env:OS -eq 'Windows_NT') {
         Check 'Windows batch launcher runs the real PowerShell entry point from another folder' {
             $fixture=New-StartupFixture
-            Push-Location $suite
-            try {
-                $command='""{0}" <NUL"' -f (Join-Path $fixture 'Start-Rehearsal.cmd')
-                $output=@(& $env:ComSpec /d /c $command 2>&1)
-                if ($LASTEXITCODE -ne 2) { throw "Batch launcher failed: $($output -join ' ')" }
-                $null=Read-RehearsalJson (Join-Path $fixture 'rehearsal-evidence/current/launcher-probe.json')
-                Remove-Item -LiteralPath (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1')
-                $output=@(& $env:ComSpec /d /c $command 2>&1)
-                if ($LASTEXITCODE -ne 1 -or ($output -join ' ') -notlike '*Workshop script missing:*') { throw 'Incomplete batch checkout did not stop with its missing path.' }
-            } finally { Pop-Location }
+            $command=Join-Path $fixture 'Start-Rehearsal.cmd'
+            $result=Invoke-StartupBatchFixture $command $suite
+            if ($result.ExitCode -ne 2) { throw "Batch launcher failed: $($result.Output)" }
+            $null=Read-RehearsalJson (Join-Path $fixture 'rehearsal-evidence/current/launcher-probe.json')
+            Remove-Item -LiteralPath (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1')
+            $result=Invoke-StartupBatchFixture $command $suite
+            if ($result.ExitCode -ne 1 -or $result.Output -notlike '*Workshop script missing:*') { throw 'Incomplete batch checkout did not stop with its missing path.' }
         }
     }
     Check 'Configuration rejects credentials, placeholder IDs, duplicate groups and wildcard IPs' {
