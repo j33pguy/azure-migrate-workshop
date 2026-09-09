@@ -30,6 +30,8 @@ Confirm **Nested Virtualization: Supported** in Microsoft's documentation for th
 
 New deployments use publisher `MicrosoftWindowsServer`, offer `windowsserver2022`, with `2022-datacenter-g2` for the host and `2022-datacenter-smalldisk-g2` for the nested Windows base disk. Both images are resolved and checked as Windows x64 Gen2 before any resource group is created. Deployment uses those exact resolved versions and prints them for the rehearsal record. Microsoft directs users from the older `WindowsServer` offer to this replacement. [Windows Server image announcement](https://techcommunity.microsoft.com/blog/azurecompute/breaking-change-for-window-server-2022-image-users-with-net-6/4262423)
 
+Image catalog requests explicitly use Compute API `2025-04-01`, independently of the installed Az.Compute SDK's default. The temporary base disk explicitly selects **Standard** security before creation, which avoids the disk cmdlet's automatic Trusted Launch image lookup and prepares the disk for export to the nested Hyper-V guests. Its configuration is checked before source resources are created. See Microsoft's [image catalog API](https://learn.microsoft.com/rest/api/compute/virtual-machine-images/get?view=rest-compute-2025-04-01) and [Standard disk security example](https://learn.microsoft.com/powershell/module/az.compute/set-azdisksecurityprofile#example-3-set-the-securitytype-to-standard-to-avoid-trustedlaunch-defaulting).
+
 ## 2. Install tools and select the subscription
 
 Install current PowerShell and Az modules from the official distribution. This repository was parsed locally with PowerShell 7; the remote host scripts target Windows PowerShell 5.1. The live rehearsal must record the actual Az versions used.

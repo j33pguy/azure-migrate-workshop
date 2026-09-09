@@ -33,7 +33,8 @@ function Test-RehearsalAzurePrerequisites {
         if (-not $records.Count -or @($records | Where-Object RegistrationState -NE 'Registered').Count) { throw "Provider $provider is not registered. Resolve registration separately before provisioning." }
     }
     $hostSku=Get-LabHostSku -VMSize $Config.VMSize -Location $Config.Location
-    $null=Get-LabWindowsImages -Location $Config.Location
+    $images=Get-LabWindowsImages -Location $Config.Location
+    $null=New-LabWindowsGuestDiskConfig -Location $Config.Location -ImageId $images.Guest.Id
     Write-Host "Selected host $($hostSku.Name): $($hostSku.Cores) enabled vCPUs, $($hostSku.MemoryGB) GiB RAM. SKU, quota and Windows image checks passed."
     Write-Host 'Confirm nested virtualization support for this series in Microsoft documentation at the environment checkpoint. Target/test capacity, policy, licensing and download access also require instructor verification.'
 }
