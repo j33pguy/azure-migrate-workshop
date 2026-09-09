@@ -30,6 +30,26 @@ function New-TestRun {
     $directory=Join-Path $suite ([guid]::NewGuid().ToString('N'))
     return $directory
 }
+function New-StartupFixture {
+    $directory=Join-Path $suite ('launcher [copy] '+[guid]::NewGuid().ToString('N'))
+    $null=[IO.Directory]::CreateDirectory((Join-Path $directory 'scripts/rehearsal'))
+    foreach ($relative in @('Start-Rehearsal.cmd','scripts/Start-LabRehearsal.ps1','scripts/common.ps1','scripts/rehearsal/engine.ps1','rehearsal.example.json')) {
+        Copy-Item -LiteralPath (Join-Path $root $relative) -Destination (Join-Path $directory $relative)
+    }
+    # Exercise the real entry point while replacing its entire Azure adapter
+    # file in this temporary checkout. A test can never provision resources.
+    $adapter=@'
+function Invoke-RehearsalEngine {
+    param($Root,$Config,$Directory)
+    Write-RehearsalJson (Join-Path $Directory 'launcher-probe.json') ([pscustomobject]@{Root=$Root;Directory=$Directory;AdminSourceCidr=$Config.AdminSourceCidr})
+    return [pscustomobject]@{Status='AwaitingInput'}
+}
+function Start-Process { param($FilePath) }
+'@
+    [IO.File]::WriteAllText((Join-Path $directory 'scripts/rehearsal/actions.ps1'),$adapter)
+    Write-RehearsalJson (Join-Path $directory 'rehearsal.local.json') $config
+    return $directory
+}
 function Invoke-RehearsalAction {
     param($Id,$Root,$Config,$State,$Directory,$AdminPassword,[switch]$Interactive)
     $script:calls.Add($Id)
@@ -62,6 +82,79 @@ function Advance-To {
     throw 'Simulated run did not reach its expected stop.'
 }
 try {
+    Check 'Fresh PowerShell process binds default launcher paths before Run and Plan' {
+        $fixture=New-StartupFixture
+        $executable=(Get-Process -Id $PID).Path
+        Push-Location $suite
+        try {
+            $output=@(& $executable -NoProfile -File (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1') -Mode Plan 2>&1)
+            if ($LASTEXITCODE -ne 0 -or ($output -join "`n") -notlike '*Plan only*') { throw "Default Plan failed: $($output -join ' ')" }
+            $output=@(& $executable -NoProfile -File (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1') -Mode Run -Interactive 2>&1)
+            if ($LASTEXITCODE -ne 2) { throw "Default Run failed: $($output -join ' ')" }
+            $probe=Read-RehearsalJson (Join-Path $fixture 'rehearsal-evidence/current/launcher-probe.json')
+            if ($probe.Root -ne $fixture -or $probe.Directory -ne (Join-Path $fixture 'rehearsal-evidence/current')) { throw 'Default paths were not based on the script folder.' }
+        } finally { Pop-Location }
+    }
+    Check 'Relative settings and results follow PowerShell location and create missing settings folders' {
+        $fixture=New-StartupFixture
+        $working=Join-Path $suite 'caller [folder]'
+        $null=[IO.Directory]::CreateDirectory($working)
+        $previous=[Environment]::CurrentDirectory
+        Push-Location -LiteralPath $working
+        try {
+            [Environment]::CurrentDirectory=$suite
+            Write-RehearsalJson 'settings/session.json' $config
+            $null=Read-RehearsalConfiguration 'settings/session.json'
+            if (-not (Test-Path -LiteralPath (Join-Path $working 'settings/session.json')) -or
+                (Test-Path -LiteralPath (Join-Path $suite 'settings/session.json'))) { throw 'Settings were written relative to the process directory.' }
+            & (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1') -Mode Run -ConfigPath 'settings/session.json' -RunDirectory 'results/run-01'
+            if ($LASTEXITCODE -ne 2) { throw 'Explicit relative paths failed.' }
+            $probe=Read-RehearsalJson 'results/run-01/launcher-probe.json'
+            if ($probe.Directory -ne (Join-Path $working 'results/run-01')) { throw 'Results were written relative to the process directory.' }
+            MustThrow { Resolve-RehearsalFileSystemPath 'Env:PATH' }
+        } finally { [Environment]::CurrentDirectory=$previous; Pop-Location }
+    }
+    Check 'Missing settings results and checkout files explain the exact startup path' {
+        $fixture=New-StartupFixture
+        $launcher=Join-Path $fixture 'scripts/Start-LabRehearsal.ps1'
+        foreach ($mode in @('Run','Status')) {
+            $message=''
+            try { & $launcher -Mode $mode -ConfigPath (Join-Path $fixture 'missing.json') -RunDirectory (Join-Path $fixture 'missing-results') }
+            catch { $message=$_.Exception.Message }
+            $expected=if ($mode -eq 'Run') { '*Settings file not found:*missing.json*' } else { '*No rehearsal results found at*state.json*' }
+            if ($message -notlike $expected -or $message -notlike '*-Mode Run -Interactive*') { throw "Missing-file guidance failed: $message" }
+        }
+        Remove-Item -LiteralPath (Join-Path $fixture 'scripts/rehearsal/actions.ps1')
+        $message=''
+        try { & $launcher -Mode Plan } catch { $message=$_.Exception.Message }
+        if ($message -notlike '*Workshop file missing:*actions.ps1*complete workshop*') { throw "Missing checkout dependency was not explained: $message" }
+    }
+    Check 'Bracketed checkout folders participate in resume fingerprints' {
+        $fixture=Join-Path $suite 'fingerprint [copy]'
+        foreach ($directory in @('scripts','tests','docs')) { $null=[IO.Directory]::CreateDirectory((Join-Path $fixture $directory)) }
+        $path=Join-Path $fixture 'scripts/sample.ps1'
+        [IO.File]::WriteAllText($path,'# before')
+        $before=Get-RehearsalFingerprint $fixture $config
+        [IO.File]::WriteAllText($path,'# after')
+        if ((Get-RehearsalFingerprint $fixture $config) -eq $before) { throw 'Code changes were omitted from the fingerprint.' }
+        Remove-Item -LiteralPath (Join-Path $fixture 'docs')
+        MustThrow { Get-RehearsalFingerprint $fixture $config }
+    }
+    if ($env:OS -eq 'Windows_NT') {
+        Check 'Windows batch launcher runs the real PowerShell entry point from another folder' {
+            $fixture=New-StartupFixture
+            Push-Location $suite
+            try {
+                $command='""{0}" <NUL"' -f (Join-Path $fixture 'Start-Rehearsal.cmd')
+                $output=@(& $env:ComSpec /d /c $command 2>&1)
+                if ($LASTEXITCODE -ne 2) { throw "Batch launcher failed: $($output -join ' ')" }
+                $null=Read-RehearsalJson (Join-Path $fixture 'rehearsal-evidence/current/launcher-probe.json')
+                Remove-Item -LiteralPath (Join-Path $fixture 'scripts/Start-LabRehearsal.ps1')
+                $output=@(& $env:ComSpec /d /c $command 2>&1)
+                if ($LASTEXITCODE -ne 1 -or ($output -join ' ') -notlike '*Workshop script missing:*') { throw 'Incomplete batch checkout did not stop with its missing path.' }
+            } finally { Pop-Location }
+        }
+    }
     Check 'Configuration rejects credentials, placeholder IDs, duplicate groups and wildcard IPs' {
         $path=Join-Path $suite 'config.json'
         Write-RehearsalJson $path $config
