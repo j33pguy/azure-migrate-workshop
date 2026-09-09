@@ -97,16 +97,48 @@ Check 'Host quotas require both family and regional records with sufficient head
     Reset-HostFixtures; $script:hostUsage=@($script:hostUsage[0],$script:hostUsage[0])
     Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
 }
-function Get-AzVMImage {
-    param($Location,$PublisherName,$Offer,$Skus,$Version,$ErrorAction)
-    if ($Offer -ne 'windowsserver2022' -or $PublisherName -ne 'MicrosoftWindowsServer') { throw 'Wrong marketplace offer.' }
-    $windowsImageCalls.Add("${Offer}:${Skus}:$Version")
-    if ($imageMode -eq 'missing' -and $Skus -match 'smalldisk') { return }
+function Get-AzContext { param($ErrorAction) [pscustomobject]@{Subscription=[pscustomobject]@{Id='fixture-sub'}} }
+function Get-AzVMImage { throw 'SDK image lookup attempted: simulated unsupported API 2026-04-01.' }
+function Invoke-ImageCatalogFixture {
+    param($Path,$Method)
+    $windowsImageCalls.Add($Path)
+    if ($Method -ne 'GET' -or $Path -notmatch '^/subscriptions/fixture-sub/providers/Microsoft.Compute/locations/eastus/publishers/MicrosoftWindowsServer/artifacttypes/vmimage/offers/windowsserver2022/skus/(2022-datacenter(?:-smalldisk)?-g2)/versions(?:/([0-9.]+))?\?api-version=2025-04-01$') {
+        throw 'Unexpected image catalog request or unsupported API version.'
+    }
+    $sku=$Matches[1]; $version=$Matches[2]
     if ($imageMode -eq 'failure') { throw 'Simulated image access failure.' }
-    if (-not $Version) { return @([pscustomobject]@{Version='20348.1.9'},[pscustomobject]@{Version='20348.1.10'}) }
-    $generation=if ($imageMode -eq 'gen1') { 'V1' } else { 'V2' }
-    $architecture=if ($imageMode -eq 'arm') { 'Arm64' } else { 'x64' }
-    [pscustomobject]@{Id="/images/$Skus/$Version";HyperVGeneration=$generation;Architecture=$architecture;OSDiskImage=[pscustomobject]@{OperatingSystem='Windows'}}
+    if ($imageMode -eq 'empty') { return [pscustomobject]@{StatusCode=200;Content=''} }
+    if ($imageMode -eq 'malformed') { return [pscustomobject]@{StatusCode=200;Content='<html>proxy error</html>'} }
+    if ($imageMode -eq 'unsupported-api') { return [pscustomobject]@{StatusCode=400;Content='{"error":{"code":"NoRegisteredProviderFound"}}'} }
+    if ($imageMode -eq 'forbidden') { return [pscustomobject]@{StatusCode=403;Content='{"error":{"code":"AuthorizationFailed"}}'} }
+    if (-not $version) {
+        $body=@(@{name='20348.1.9'},@{name='20348.1.10'})
+        if ($imageMode -eq 'missing' -and $sku -match 'smalldisk') { $body=@() }
+        if ($imageMode -eq 'invalid-version') { $body=@(@{name='latest'}) }
+        if ($imageMode -eq 'missing-version') { $body=@(@{id='/no-name'}) }
+    } else {
+        $body=@{id=($Path -split '\?')[0];properties=@{hyperVGeneration='V2';architecture='x64';osDiskImage=@{operatingSystem='Windows'}}}
+        switch ($imageMode) {
+            'wrong-id' { $body.id='/subscriptions/another-sub/wrong-image' }
+            'gen1' { $body.properties.hyperVGeneration='V1' }
+            'arm' { $body.properties.architecture='Arm64' }
+            'linux' { $body.properties.osDiskImage.operatingSystem='Linux' }
+            'missing-properties' { $body.Remove('properties') }
+        }
+    }
+    [pscustomobject]@{StatusCode=200;Content=(ConvertTo-Json -InputObject $body -Depth 8 -Compress)}
+}
+function Invoke-AzRestMethod { param($Path,$Method,$ErrorAction) Invoke-ImageCatalogFixture $Path $Method }
+function New-AzDiskConfig {
+    param($Location,$CreateOption,$HyperVGeneration,$OsType,$ImageReference,$ErrorAction)
+    [pscustomobject]@{Location=$Location;CreateOption=$CreateOption;HyperVGeneration=$HyperVGeneration;OsType=$OsType;ImageReference=$ImageReference;SecurityProfile=$null}
+}
+function Set-AzDiskSecurityProfile {
+    param($Disk,$SecurityType,$ErrorAction)
+    if ($SecurityType -ne 'Standard') { throw 'The guest export disk must explicitly select Standard security.' }
+    if ($diskMode -eq 'ignored') { return $Disk }
+    $Disk.SecurityProfile=[pscustomobject]@{SecurityType=$SecurityType}
+    return $Disk
 }
 Check 'Windows host and guest images use the current offer and exact newest versions' {
     $script:imageMode='good'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
@@ -115,30 +147,57 @@ Check 'Windows host and guest images use the current offer and exact newest vers
         $images.Host.Sku -ne '2022-datacenter-g2' -or $images.Guest.Sku -ne '2022-datacenter-smalldisk-g2' -or
         $windowsImageCalls.Count -ne 4) { throw 'Wrong image selection.' }
 }
-Check 'Unavailable or incompatible Windows images stop preflight' {
-    foreach ($mode in @('missing','failure','gen1','arm')) {
+Check 'Unavailable incompatible malformed or unverified Windows images stop preflight' {
+    foreach ($mode in @('missing','failure','gen1','arm','linux','wrong-id','missing-properties','invalid-version','missing-version','empty','malformed','forbidden')) {
         $script:imageMode=$mode; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
         Should-Throw { Get-LabWindowsImages eastus }
     }
 }
-Check 'Direct deployment rejects invalid host or image metadata before creating resources' {
+Check 'Catalog errors preserve the Azure code and never fall back to the SDK image API' {
+    $script:imageMode='unsupported-api'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+    $message=''
+    try { $null=Get-LabWindowsImages eastus } catch { $message=$_.Exception.Message }
+    if ($message -notlike '*NoRegisteredProviderFound*API 2025-04-01*' -or $windowsImageCalls.Count -ne 1) { throw 'API failure was hidden or retried through an unsupported SDK default.' }
+}
+Check 'Temporary guest disk retains Standard security and the exact validated image' {
+    $script:diskMode='good'; $script:imageMode='good'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+    $images=Get-LabWindowsImages eastus
+    $disk=New-LabWindowsGuestDiskConfig eastus $images.Guest.Id
+    if ($disk.SecurityProfile.SecurityType -ne 'Standard' -or $disk.ImageReference.Id -cne $images.Guest.Id -or
+        $disk.HyperVGeneration -ne 'V2' -or $disk.OsType -ne 'Windows' -or $disk.CreateOption -ne 'FromImage') { throw 'Export disk configuration is incompatible with the Hyper-V guests.' }
+    $script:diskMode='ignored'
+    Should-Throw { New-LabWindowsGuestDiskConfig eastus $images.Guest.Id }
+}
+Check 'Direct deployment rejects invalid host image API or disk security before creating resources' {
     function Import-Module { param($Name,$ErrorAction) if ($Name -notlike 'Az.*') { throw 'Unexpected module import.' } }
     function Get-AzContext { param($ErrorAction) [pscustomobject]@{Subscription=[pscustomobject]@{Id='fixture-sub'}} }
-    function Invoke-AzRestMethod { param($Path,$Method,$ErrorAction) [pscustomobject]@{StatusCode=404;Content='{"error":{"code":"ResourceGroupNotFound"}}'} }
+    function Invoke-AzRestMethod {
+        param($Path,$Method,$ErrorAction)
+        if ($Path -match '/resourcegroups/') { return [pscustomobject]@{StatusCode=404;Content='{"error":{"code":"ResourceGroupNotFound"}}'} }
+        Invoke-ImageCatalogFixture $Path $Method
+    }
     function Set-AzVMRunCommand { param($ProtectedParameter) throw 'Unexpected Run Command.' }
     function Get-AzVMRunCommand { throw 'Unexpected Run Command lookup.' }
     function New-AzResourceGroup { $script:resourceCreateCalls++; throw 'Unexpected resource creation.' }
     $script:resourceCreateCalls=0
     $password=ConvertTo-SecureString 'Fixture-Only-Password123!' -AsPlainText -Force
-    foreach ($case in @('host','image')) {
-        Reset-HostFixtures; $script:imageMode='missing'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+    foreach ($case in @('host','image','api','security')) {
+        Reset-HostFixtures; $script:imageMode='good'; $script:diskMode='good'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
         if ($case -eq 'host') { ($script:hostSkus[0].Capabilities | Where-Object Name -EQ 'MemoryGB').Value='32' }
+        if ($case -eq 'image') { $script:imageMode='missing' }
+        if ($case -eq 'api') { $script:imageMode='unsupported-api' }
+        if ($case -eq 'security') { $script:diskMode='ignored' }
         $message=''
         try {
             & "$root/scripts/deploy-lab.ps1" -SubscriptionId fixture-sub -ResourceGroupName source-test -Location eastus `
                 -AdminUsername labadmin -AdminPassword $password -AdminSourceCidr '203.0.113.42/32' -VMSize Standard_D16s_v5
         } catch { $message=$_.Exception.Message }
-        $expected=if ($case -eq 'host') { 'at least 8 enabled vCPUs and 64 GiB' } else { 'No Windows image versions found' }
+        $expected=switch ($case) {
+            'host' { 'at least 8 enabled vCPUs and 64 GiB' }
+            'image' { 'No Windows image versions found' }
+            'api' { 'NoRegisteredProviderFound' }
+            'security' { 'did not retain Standard security' }
+        }
         if ($message -notlike "*$expected*" -or $script:resourceCreateCalls) { throw "Deployment did not stop at the expected $case gate: $message" }
     }
 }
