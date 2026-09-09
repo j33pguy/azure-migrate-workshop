@@ -495,5 +495,8 @@ Check 'Cleanup completion requires verified absence and does not hide post-delet
         $global:cesAllowMockDelete=$false; $global:cesDeletedNames=@(); $global:cesDeleteCalls=0; $global:cesAfterDeleteMode='missing'
     }
 }
+Check 'Deployment health monitoring handles failure timeout recovery and protected output' {
+    & "$PSScriptRoot/Test-DeploymentHealth.ps1"
+}
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count local checks passed. Azure/Hyper-V execution has not been tested."

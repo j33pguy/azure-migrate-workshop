@@ -62,6 +62,22 @@ At each baseline checkpoint, provide the absolute path to its independent copy o
 
 Network checks inspect each actual VM/NIC and require the expected test or final subnet and no public NIC IP. Run Command then probes SQL 1433, Nginx 80 and Node 3000 from the Windows web VM. These checks validate TCP reachability, not a business dependency, DNS configuration or internet isolation. The test VNet still has outbound NAT access.
 
+## Progress during deployment
+
+Source deployment and target/test network creation print the current operation, elapsed time and its limit about every 30 seconds. During guest setup the monitor reads Azure's reported execution state and the last available host phase. A process marked `Running` is still awaiting completion; it is not an application health pass. Azure can delay output and status responses, so the display is not a guaranteed real-time heartbeat.
+
+The latest credential-free summary is `artifacts/deployment-health.json` inside the rehearsal results directory. Read it while the main window is busy:
+
+```powershell
+Get-Content -LiteralPath .\rehearsal-evidence\current\artifacts\deployment-health.json -Raw | ConvertFrom-Json
+```
+
+Standalone `deploy-lab.ps1` writes `.artifacts/deployment-health-<resource-group>.json`; standalone target/test network setup writes `.artifacts/network-health-<resource-group>.json`. Both accept an explicit `-HealthPath`. This summary records stage, state, elapsed time and last update; it does not copy command output, passwords or signed download URLs. The main rehearsal report still records the stage outcome when the operation returns.
+
+Reported setup failures stop at the next status observation. Repeated unreadable status stops monitoring after five minutes; a setup command that never reports `Running` has a 15-minute startup limit. These deadlines are evaluated between Azure responses: an individual SDK request can take longer than the nominal polling interval. A loss of monitoring means **review required**, not confirmed cancellation.
+
+See [deployment limits and recovery](Troubleshooting.md#long-running-deployment) for installer limits, diagnostics and safe handling of an uncertain operation. Portal checkpoints still require instructor observation; this monitor does not automatically assess replication or cutover jobs started in the portal.
+
 ## Resume and failure recovery
 
 Keep the same checkout, settings and evidence directory. The runner verifies a fingerprint of the configuration, scripts, tests and guides and hashes of recorded evidence. It refuses changed configuration/code, corrupted state, altered evidence or out-of-order completion. Only one process can own a run directory. Do not edit `state.json` to mark steps complete.

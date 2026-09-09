@@ -214,6 +214,12 @@ function Read-LabHostConfiguration {
     param([Parameter(Mandatory)][string]$Path)
     $content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
     if ([string]::IsNullOrWhiteSpace($content)) { throw 'The host configuration script is empty. Obtain the complete workshop checkout.' }
+    $healthPath = Join-Path (Split-Path (Split-Path $Path -Parent) -Parent) 'health.ps1'
+    $health = Get-Content -LiteralPath $healthPath -Raw -Encoding UTF8 -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($health) -or ([regex]::Matches($content, '(?m)^# LAB_HEALTH_HELPERS\r?$')).Count -ne 1) {
+        throw 'Host health helpers are missing or incompatible. Obtain the complete workshop checkout.'
+    }
+    $content = $content.Replace('# LAB_HEALTH_HELPERS', $health)
     $tokens = $null; $errors = $null
     $null = [System.Management.Automation.Language.Parser]::ParseInput($content, [ref]$tokens, [ref]$errors)
     if ($errors.Count) { throw 'The host configuration script has syntax errors. Obtain the reviewed workshop revision.' }

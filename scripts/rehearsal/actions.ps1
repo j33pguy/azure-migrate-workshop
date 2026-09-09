@@ -140,10 +140,12 @@ function Invoke-RehearsalAction {
         'azure-preflight' { Test-RehearsalAzurePrerequisites $Config }
         'deploy-source' {
             & (Join-Path $Root 'scripts/deploy-lab.ps1') -SubscriptionId $Config.SubscriptionId -ResourceGroupName $Config.SourceResourceGroup -Location $Config.Location `
-                -AdminUsername $Config.AdminUsername -AdminPassword $AdminPassword -AdminSourceCidr $Config.AdminSourceCidr -VMSize $Config.VMSize
+                -AdminUsername $Config.AdminUsername -AdminPassword $AdminPassword -AdminSourceCidr $Config.AdminSourceCidr -VMSize $Config.VMSize `
+                -HealthPath (Join-Path $Directory 'artifacts/deployment-health.json')
         }
         'target-networks' {
-            & (Join-Path $Root 'scripts/migrate-step1-setup-project.ps1') -SubscriptionId $Config.SubscriptionId -SourceResourceGroup $Config.SourceResourceGroup -TargetResourceGroup $Config.TargetResourceGroup -Location $Config.Location
+            & (Join-Path $Root 'scripts/migrate-step1-setup-project.ps1') -SubscriptionId $Config.SubscriptionId -SourceResourceGroup $Config.SourceResourceGroup -TargetResourceGroup $Config.TargetResourceGroup -Location $Config.Location `
+                -HealthPath (Join-Path $Directory 'artifacts/deployment-health.json')
         }
         { $_ -in @('test-workloads','final-workloads','test-network','final-network','test-sql','final-sql','post-inventory') } {
             $phase=if ($Id.StartsWith('test-')) { 'test' } else { 'final' }

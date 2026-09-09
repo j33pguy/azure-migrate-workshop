@@ -25,6 +25,44 @@ Start with the first failed stage. Record the exact repository revision, run ID,
 
 Reports live under `rehearsal-evidence/current/` by default. Exit code `0` means all stages completed with instructor evidence; `1` means failure/review is required; `2` means paused. A pause or closed window does not stop billable Azure resources. See the [complete launcher guide](Automated-Rehearsal.md).
 
+## Long-running deployment
+
+Do not wait for the entire workshop timeout after an operation reports failure. The deployment monitor checks job results and managed Run Command execution separately: Azure accepting a command is not proof that the script or samples succeeded. [Microsoft's managed Run Command status guidance](https://learn.microsoft.com/azure/virtual-machines/windows/run-command-managed) distinguishes extension provisioning from script execution and exposes the latest available output.
+
+| Observation | What happens / next action |
+|---|---|
+| Operation is `Running` with increasing elapsed time | The client is alive and waiting. A running process can still be stalled; inspect its phase and operation-specific deadline. |
+| Setup reports `Failed`, `TimedOut` or cancellation, or extension provisioning fails | The runner stops at the next observation and retains `ConfigureWorkshop` for diagnostics. Start with its exit code/error and the host setup log. |
+| `StatusUnavailable` persists for five minutes | Monitoring stops instead of retrying for four hours. Check Azure sign-in, connectivity, VM agent and the command directly. The remote script may still be running. |
+| Setup has no `Running` state after 15 minutes | Review VM-agent and command provisioning. The command might start later; do not submit it again. |
+| Ubuntu download transfers no additional bytes for five minutes | The BITS download fails and its transfer job is removed. Correct connectivity before starting a fresh deployment. |
+| An operation exceeds its deadline | The runner stops. Stopping a local Azure job is not proof that Azure cancelled its request. Native host processes are asked to stop as a process tree; inspect installer state before recovery. |
+
+| Operation | Default limit |
+|---|---|
+| Each Azure source/target/test network, VM or image-disk creation | 60 minutes; both deployment scripts accept `-AzureOperationTimeoutMinutes` in the range 15–120 |
+| Hyper-V feature installation / host restart / setup submission | 30 / 15 / 15 minutes |
+| Chocolatey or QEMU installation / each image conversion / IIS setup | 30 minutes |
+| ADK installer / Ubuntu image download | 60 minutes |
+| Windows image download | 90 minutes; process/exit-code monitoring, not byte-based stall detection |
+| SQL installer / complete SQL guest setup | 60 / 75 minutes |
+| Windows guest heartbeat and management readiness / final application readiness | 15 / 20 minutes |
+| Overall guest setup | 240 minutes; `-GuestSetupTimeoutMinutes` accepts 30–240, plus ten minutes for final status delivery |
+
+Adjust a limit only after identifying a healthy slow operation. These are upper bounds, not expected runtimes. The Azure/Hyper-V live rehearsal must establish realistic timings in the delivery environment. Small installer/checksum downloads use a five-minute request timeout.
+
+Inspect the setup command without rerunning it:
+
+```powershell
+$command = Get-AzVMRunCommand -ResourceGroupName $sourceRg -VMName HyperVHost -RunCommandName ConfigureWorkshop -Expand InstanceView
+$command | Select-Object ProvisioningState
+$command.InstanceView | Select-Object ExecutionState, ExitCode, StartTime, EndTime, Error, Output
+```
+
+On the host, inspect `C:\AzMigrateLab\setup-log.txt` and `C:\AzMigrateLab\process-*.log`; inside the SQL guest, inspect SQL Setup Bootstrap logs. Process logs are kept in the restricted setup directory and can include download URLs or installer details: redact them before attaching anything to an issue.
+
+When script termination is unconfirmed, the deployment retains `WinServerBase-temp` and its export access so a still-running download is not interrupted. The grant expires after five hours. Once `ConfigureWorkshop` has stopped, revoke the grant and remove the temporary disk if automatic cleanup did not run. The command and remaining resources can continue to incur cost; a local monitoring failure does not delete them. Follow [Cleanup](Cleanup.md), and preserve the failed rehearsal record rather than replaying provisioning into an existing group.
+
 ## Source deployment and first boot
 
 | Symptom | Inspect before changing anything |
