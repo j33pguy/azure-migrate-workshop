@@ -5,19 +5,19 @@ function Get-RehearsalPlan {
     $rows = @(
         @('local-checks','Check workshop scripts','Automatic','','Run the local PowerShell regression suite.','Safe'),
         @('azure-preflight','Check Azure subscription and source capacity','Automatic','Module-0-Setup.md','Check the exact tenant/subscription, modules, providers, unused group names and source-host quota.','Safe'),
-        @('environment-review','Record instructor preparation','Checkpoint','Module-0-Setup.md','Record pricing estimate, spending alert and cleanup deadline, licensing, policy/RDP/download access and target/test capacity review.','Safe'),
+        @('environment-review','Record instructor preparation','Checkpoint','Module-0-Setup.md','Record the selected host size and Microsoft series documentation confirming nested virtualization with Standard security, pricing estimate, spending alert and cleanup deadline, licensing, policy/RDP/download access and target/test capacity review.','Safe'),
         @('deploy-source','Deploy Hyper-V host and five guests','Provision','Module-0-Setup.md','Creates billable source resources and waits for source workload readiness.','Unsafe'),
         @('source-review','Record source image and network evidence','Checkpoint','Module-0-Setup.md','Record setup-complete.json, guest/image/package versions, DHCP, source endpoint checks and free host disk/RAM.','Safe'),
         @('target-networks','Create isolated target and test networks','Provision','Module-0-Setup.md','Creates billable target resources including two NAT gateways and public IPs.','Unsafe'),
         @('discovery','Register appliance, discover and assess','Checkpoint','Module-1-Discovery.md','Complete project creation, host preparation, appliance installation/sign-in, four named workloads and reviewed assessment.','Safe'),
-        @('pretest-baseline','Preserve source SQL baseline','Checkpoint','Module-2-Agentless-Migration.md','Stop sample-data edits. Copy the reviewed SQL helper into the source SQL VM, capture source-pretest.baseline.json and retain an independent local copy. Set BaselinePath below to that copy.','Safe'),
-        @('replication','Register host provider and replicate','Checkpoint','Module-2-Agentless-Migration.md','Register the Hyper-V host provider to this project. Record all four healthy replication jobs and completed initial synchronization.','Safe'),
-        @('test-migration','Create test VMs through Azure Migrate','Checkpoint','Module-2-Agentless-Migration.md','Run all four test migrations into the isolated test VNet. Record successful jobs and fill VMNames with the actual four Azure test names.','Safe'),
-        @('test-workloads','Test four running test workloads','Automatic','Module-2-Agentless-Migration.md','Use VM Run Command to check IIS, Nginx, Node API and SQL integrity.','Safe'),
-        @('test-network','Test isolated VM networking','Automatic','Module-2-Agentless-Migration.md','Verify all four VMs use the test subnet without public NIC IPs; probe SQL, Nginx and Node ports from the Windows web VM.','Safe'),
-        @('test-sql','Compare test SQL data with source','Automatic','Module-2-Agentless-Migration.md','Verify the replicated baseline and SQL helper hashes, then compare all defined sample-table columns.','Safe'),
-        @('test-cleanup','Clean up test migration in Azure Migrate','Checkpoint','Module-2-Agentless-Migration.md','Use service-managed test cleanup for every workload; record job completion and absence of test VM/disks.','Safe'),
-        @('test-absence','Verify test VMs are removed','Automatic','Module-2-Agentless-Migration.md','Verify the recorded test VM names no longer appear in the target group. Disk/service cleanup evidence is recorded separately.','Safe'),
+        @('pretest-baseline','Preserve source SQL baseline','Checkpoint','Module-2-HyperV-Migration.md','Stop sample-data edits. Copy the reviewed SQL helper into the source SQL VM, capture source-pretest.baseline.json and retain an independent local copy. Set BaselinePath below to that copy.','Safe'),
+        @('replication','Register host provider and replicate','Checkpoint','Module-2-HyperV-Migration.md','Register the Hyper-V host provider to this project. Record all four healthy replication jobs and completed initial synchronization.','Safe'),
+        @('test-migration','Create test VMs through Azure Migrate','Checkpoint','Module-2-HyperV-Migration.md','Run all four test migrations into the isolated test VNet. Record successful jobs and fill VMNames with the actual four Azure test names.','Safe'),
+        @('test-workloads','Test four running test workloads','Automatic','Module-2-HyperV-Migration.md','Use VM Run Command to check IIS, Nginx, Node API and SQL integrity.','Safe'),
+        @('test-network','Test isolated VM networking','Automatic','Module-2-HyperV-Migration.md','Verify all four VMs use the test subnet without public NIC IPs; probe SQL, Nginx and Node ports from the Windows web VM.','Safe'),
+        @('test-sql','Compare test SQL data with source','Automatic','Module-2-HyperV-Migration.md','Verify the replicated baseline and SQL helper hashes, then compare all defined sample-table columns.','Safe'),
+        @('test-cleanup','Clean up test migration in Azure Migrate','Checkpoint','Module-2-HyperV-Migration.md','Use service-managed test cleanup for every workload; record job completion and absence of test VM/disks.','Safe'),
+        @('test-absence','Verify test VMs are removed','Automatic','Module-2-HyperV-Migration.md','Verify the recorded test VM names no longer appear in the target group. Disk/service cleanup evidence is recorded separately.','Safe'),
         @('precutover-baseline','Prepare SQL baseline, backup and cutover','Checkpoint','Module-3-Stateful-Migration.md','Stop writers, capture source-precutover.baseline.json, preserve an independent copy, and record backup/VERIFYONLY, maintenance window and rollback decision. Set BaselinePath below.','Safe'),
         @('cutover','Perform planned cutover in Azure Migrate','Checkpoint','Module-3-Stateful-Migration.md','Perform planned source shutdown/final synchronization and migration for all four workloads. Record job results, timings and actual final VMNames. Do not complete migration until acceptance passes.','Safe'),
         @('source-off','Verify all four source workloads are off','Automatic','Module-3-Stateful-Migration.md','Check the actual nested Hyper-V workload power states.','Safe'),
@@ -72,7 +72,7 @@ function Read-RehearsalConfiguration {
     if ($config.Location -notmatch '^[a-z][a-z0-9]+$') { throw 'Use the Azure region identifier, for example eastus.' }
     if ($config.AdminUsername -notmatch '^[a-z][a-z0-9]{2,18}$' -or $config.AdminUsername -in @('admin','administrator','root','guest','user','test')) { throw 'Choose a non-reserved lab administrator name, such as labadmin.' }
     Assert-LabAdminSource $config.AdminSourceCidr
-    if ($config.VMSize -notin @('Standard_E8s_v5','Standard_E16s_v5')) { throw 'Unsupported nested Hyper-V host size.' }
+    Assert-LabHostSizeName $config.VMSize
     return $config
 }
 

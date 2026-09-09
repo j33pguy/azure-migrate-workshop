@@ -33,6 +33,115 @@ Check 'PowerShell examples in all learner guides parse' {
     }
 }
 . "$root/scripts/common.ps1"
+# Public Azure response fixtures; no module import, sign-in or service calls.
+function New-HostSkuFixture {
+    param([string]$Name='Standard_D16s_v5')
+    $values=@{vCPUs='16';vCPUsAvailable='16';MemoryGB='64';CpuArchitectureType='x64';HyperVGenerations='V1,V2';PremiumIO='True';AcceleratedNetworkingEnabled='True'}
+    [pscustomobject]@{Name=$Name;ResourceType='virtualMachines';Locations=@('eastus');Restrictions=@();Family='standardDSv5Family';
+        Capabilities=@($values.GetEnumerator() | ForEach-Object { [pscustomobject]@{Name=$_.Key;Value=$_.Value} })}
+}
+function Get-AzComputeResourceSku {
+    param($Location,$ErrorAction)
+    $script:hostSkuLookupLocation=$Location
+    if ($hostLookupFailure) { throw 'Simulated Azure lookup failure.' }
+    $hostSkus
+}
+function Get-AzVMUsage { param($Location,$ErrorAction) $hostUsage }
+function Reset-HostFixtures {
+    $script:hostLookupFailure=$false
+    $script:hostSkus=@((New-HostSkuFixture), (New-HostSkuFixture 'Standard_E8s_v5'))
+    $script:hostUsage=@(
+        [pscustomobject]@{Name=[pscustomobject]@{Value='standardDSv5Family'};Limit=32;CurrentValue=16},
+        [pscustomobject]@{Name=[pscustomobject]@{Value='cores'};Limit=64;CurrentValue=16})
+}
+Check 'Host validation uses the selected SKU and region without a fixed size list' {
+    Reset-HostFixtures
+    $selected=Get-LabHostSku -VMSize Standard_D16s_v5 -Location eastus
+    if ($selected.Name -ne 'Standard_D16s_v5' -or $selected.Cores -ne 16 -or $selected.MemoryGB -ne 64 -or
+        -not $selected.AcceleratedNetworking -or $hostSkuLookupLocation -ne 'eastus') { throw 'Wrong host profile selected.' }
+    $script:hostSkus[0].Name='Standard_E32s_v5'
+    if ((Get-LabHostSku -VMSize Standard_E32s_v5 -Location eastus).Name -ne 'Standard_E32s_v5') { throw 'Alternative size blocked.' }
+}
+Check 'Host validation refuses missing, duplicate and region-restricted SKUs' {
+    Reset-HostFixtures
+    Should-Throw { Get-LabHostSku Standard_Unknown99 eastus }
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 westus2 }
+    $script:hostSkus+=New-HostSkuFixture
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+    Reset-HostFixtures
+    $script:hostSkus[0].Restrictions=@([pscustomobject]@{Type='Location'})
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+    Reset-HostFixtures; $script:hostLookupFailure=$true
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+}
+Check 'Host validation rejects insufficient or incompatible CPU RAM architecture and storage' {
+    foreach ($case in @(@('vCPUs','0'),@('vCPUs','unknown'),@('vCPUsAvailable','4'),@('vCPUsAvailable','unknown'),
+        @('MemoryGB','32'),@('MemoryGB','unknown'),@('CpuArchitectureType','Arm64'),@('HyperVGenerations','V1'),@('PremiumIO','False'))) {
+        Reset-HostFixtures
+        ($script:hostSkus[0].Capabilities | Where-Object Name -EQ $case[0]).Value=$case[1]
+        Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+    }
+    Reset-HostFixtures
+    $script:hostSkus[0].Capabilities=@($script:hostSkus[0].Capabilities | Where-Object Name -NE 'MemoryGB')
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+}
+Check 'Host quotas require both family and regional records with sufficient headroom' {
+    foreach ($index in @(0,1)) {
+        Reset-HostFixtures; $script:hostUsage[$index].Limit=31
+        Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+        Reset-HostFixtures; $script:hostUsage=@($script:hostUsage[$index])
+        Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+    }
+    Reset-HostFixtures; $script:hostUsage[0].Limit=$null
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+    Reset-HostFixtures; $script:hostUsage=@($script:hostUsage[0],$script:hostUsage[0])
+    Should-Throw { Get-LabHostSku Standard_D16s_v5 eastus }
+}
+function Get-AzVMImage {
+    param($Location,$PublisherName,$Offer,$Skus,$Version,$ErrorAction)
+    if ($Offer -ne 'windowsserver2022' -or $PublisherName -ne 'MicrosoftWindowsServer') { throw 'Wrong marketplace offer.' }
+    $windowsImageCalls.Add("${Offer}:${Skus}:$Version")
+    if ($imageMode -eq 'missing' -and $Skus -match 'smalldisk') { return }
+    if ($imageMode -eq 'failure') { throw 'Simulated image access failure.' }
+    if (-not $Version) { return @([pscustomobject]@{Version='20348.1.9'},[pscustomobject]@{Version='20348.1.10'}) }
+    $generation=if ($imageMode -eq 'gen1') { 'V1' } else { 'V2' }
+    $architecture=if ($imageMode -eq 'arm') { 'Arm64' } else { 'x64' }
+    [pscustomobject]@{Id="/images/$Skus/$Version";HyperVGeneration=$generation;Architecture=$architecture;OSDiskImage=[pscustomobject]@{OperatingSystem='Windows'}}
+}
+Check 'Windows host and guest images use the current offer and exact newest versions' {
+    $script:imageMode='good'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+    $images=Get-LabWindowsImages eastus
+    if ($images.Host.Version -ne '20348.1.10' -or $images.Guest.Version -ne '20348.1.10' -or
+        $images.Host.Sku -ne '2022-datacenter-g2' -or $images.Guest.Sku -ne '2022-datacenter-smalldisk-g2' -or
+        $windowsImageCalls.Count -ne 4) { throw 'Wrong image selection.' }
+}
+Check 'Unavailable or incompatible Windows images stop preflight' {
+    foreach ($mode in @('missing','failure','gen1','arm')) {
+        $script:imageMode=$mode; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+        Should-Throw { Get-LabWindowsImages eastus }
+    }
+}
+Check 'Direct deployment rejects invalid host or image metadata before creating resources' {
+    function Import-Module { param($Name,$ErrorAction) if ($Name -notlike 'Az.*') { throw 'Unexpected module import.' } }
+    function Get-AzContext { param($ErrorAction) [pscustomobject]@{Subscription=[pscustomobject]@{Id='fixture-sub'}} }
+    function Invoke-AzRestMethod { param($Path,$Method,$ErrorAction) [pscustomobject]@{StatusCode=404;Content='{"error":{"code":"ResourceGroupNotFound"}}'} }
+    function Set-AzVMRunCommand { param($ProtectedParameter) throw 'Unexpected Run Command.' }
+    function Get-AzVMRunCommand { throw 'Unexpected Run Command lookup.' }
+    function New-AzResourceGroup { $script:resourceCreateCalls++; throw 'Unexpected resource creation.' }
+    $script:resourceCreateCalls=0
+    $password=ConvertTo-SecureString 'Fixture-Only-Password123!' -AsPlainText -Force
+    foreach ($case in @('host','image')) {
+        Reset-HostFixtures; $script:imageMode='missing'; $script:windowsImageCalls=[Collections.Generic.List[string]]::new()
+        if ($case -eq 'host') { ($script:hostSkus[0].Capabilities | Where-Object Name -EQ 'MemoryGB').Value='32' }
+        $message=''
+        try {
+            & "$root/scripts/deploy-lab.ps1" -SubscriptionId fixture-sub -ResourceGroupName source-test -Location eastus `
+                -AdminUsername labadmin -AdminPassword $password -AdminSourceCidr '203.0.113.42/32' -VMSize Standard_D16s_v5
+        } catch { $message=$_.Exception.Message }
+        $expected=if ($case -eq 'host') { 'at least 8 enabled vCPUs and 64 GiB' } else { 'No Windows image versions found' }
+        if ($message -notlike "*$expected*" -or $script:resourceCreateCalls) { throw "Deployment did not stop at the expected $case gate: $message" }
+    }
+}
 # Load pure helpers from the real host payload without executing its setup body.
 $tokens=$null; $errors=$null
 $hostAst=[System.Management.Automation.Language.Parser]::ParseFile("$root/scripts/host/configure-host.ps1",[ref]$tokens,[ref]$errors)

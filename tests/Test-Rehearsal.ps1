@@ -82,8 +82,20 @@ try {
         $directory=New-TestRun
         $plan=@(Get-RehearsalPlan)
         if ($plan.Count -ne 28 -or $calls.Count -ne 0 -or $plan[-1].Id -ne 'cleanup') { throw 'Unexpected plan or side effect.' }
-        foreach ($guide in @('Module-0-Setup.md','Module-1-Discovery.md','Module-2-Agentless-Migration.md','Module-3-Stateful-Migration.md','Module-4-ASR-Comparison.md','Module-5-Post-Migration.md','Cleanup.md')) {
+        foreach ($guide in @('Module-0-Setup.md','Module-1-Discovery.md','Module-2-HyperV-Migration.md','Module-3-Stateful-Migration.md','Module-4-ASR-Comparison.md','Module-5-Post-Migration.md','Cleanup.md')) {
             if ($guide -notin $plan.Guide) { throw "Missing guide $guide" }
+        }
+    }
+    Check 'Configuration preserves alternative host sizes and rejects malformed names' {
+        $path=Join-Path $suite 'host-size-config.json'
+        $candidate=$config | ConvertTo-Json | ConvertFrom-Json
+        foreach ($size in @('Standard_D16s_v5','Standard_E32s_v5','Standard_E8as_v5')) {
+            $candidate.VMSize=$size; Write-RehearsalJson $path $candidate
+            if ((Read-RehearsalConfiguration $path).VMSize -cne $size) { throw 'Selected host size was replaced.' }
+        }
+        foreach ($size in @('Standard_*',' Standard_D16s_v5','Standard_D16s_v5;whoami','')) {
+            $candidate.VMSize=$size; Write-RehearsalJson $path $candidate
+            MustThrow { Read-RehearsalConfiguration $path }
         }
     }
     Check 'Missing/manual evidence pauses and cannot silently pass or start provisioning' {

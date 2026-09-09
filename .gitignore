@@ -15,6 +15,7 @@ Thumbs.db
 *.publishsettings
 
 # Local validation environments and participant evidence
+.artifacts/
 .venv/
 __pycache__/
 *.VaultCredentials

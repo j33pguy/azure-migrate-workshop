@@ -13,7 +13,7 @@ Microsoft documents interactive appliance configuration/sign-in and a Hyper-V ho
 1. Use a complete, reviewed checkout on a persistent Windows workstation with Windows PowerShell 5.1 and the Az modules installed as described in [Module 0](Module-0-Setup.md). Keep this workstation available throughout the rehearsal. Python, bash and Node.js are used by the separate development checks/CI; the launcher does not require them.
 2. Choose two new dedicated resource-group names, the real tenant/subscription IDs, region, current public IPv4 `/32` and a lab administrator name. The launcher saves these settings in `rehearsal.local.json`, which Git ignores. You can instead copy [rehearsal.example.json](../rehearsal.example.json) to that filename and edit it. Replace both zero GUIDs and the IP placeholder.
 3. Double-click the launcher. If local execution policy or downloaded-file protection blocks it, review the files and use your organization's approved trust/unblock process. The launcher does not bypass execution policy or install dependencies automatically.
-4. Sign in to the configured tenant/subscription when prompted. Automatic preflight checks source-host SKU restrictions, host/family vCPU quotas, provider registration and that both group names are unused. Policy, target/test sizing and capacity, licensing, cost estimates, alerts and download access remain part of the environment checkpoint.
+4. Sign in to the configured tenant/subscription when prompted. Automatic preflight checks your selected host size's regional restrictions, CPU/RAM, x64/Gen2/Premium SSD support, host/family vCPU quotas, both Windows images, provider registration and unused group names. Confirm nested virtualization support for that series from Microsoft documentation at the environment checkpoint, along with policy, target/test capacity, licensing, costs, alerts and download access. See [host selection](Module-0-Setup.md).
 5. At the first provisioning stage, review the exact subscription/region/group names and type `PROVISION` to authorize both deployment stages for that invocation. Enter the lab-only password at its hidden prompt. It is passed as a SecureString and is not saved in runner settings, state or reports.
 
 The scripts create billable resources. Resource-provider registration is a separate Module 0 preparation step; the runner checks registration but does not change it. A stopped or paused runner does not deallocate VMs or remove NAT gateways, disks, IPs or backups. Keep the cleanup deadline in the environment record.
@@ -49,11 +49,11 @@ The report is a local rehearsal record, not a training certification. Reconcile 
 | Operate | Final inventory | Module 4 discussion and chosen Module 5 monitoring/backup/restore exercises |
 | Clean up | Preview; explicitly authorized group deletion; verify absence | Service/vault cleanup, retained evidence and any resources outside the groups |
 
-The runner has 28 ordered stages. Guide scripts are not executed as test steps; their printed instructions cannot produce an automated pass. The migration operations in the table are instructor checkpoints in this version.
+The runner has 28 ordered stages: 15 scripted stages and 13 instructor checkpoints. Migration operations in the table require instructor execution and evidence.
 
 ## SQL and network checks
 
-Follow the unchanged source-baseline steps in [Module 2](Module-2-Agentless-Migration.md) and [Module 3](Module-3-Stateful-Migration.md). The reviewed helper must be copied to `C:\LabTools\Test-LabSqlData.ps1` inside the source SQL VM. Capture these files there before the relevant synchronization point:
+Follow the source-baseline steps in [Module 2](Module-2-HyperV-Migration.md) and [Module 3](Module-3-Stateful-Migration.md). The reviewed helper must be copied to `C:\LabTools\Test-LabSqlData.ps1` inside the source SQL VM. Capture these files there before the relevant synchronization point:
 
 - Test: `C:\LabEvidence\source-pretest.baseline.json`.
 - Final cutover: `C:\LabEvidence\source-precutover.baseline.json`.

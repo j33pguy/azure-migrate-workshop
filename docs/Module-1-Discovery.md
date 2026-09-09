@@ -66,4 +66,4 @@ The sample IIS site, Nginx site and Node API do **not** call SQL or each other. 
 
 Optional instructor extension: implement and document a real database-consuming application in a separate exercise, then repeat discovery with generated traffic.
 
-**Pass gate:** the appliance is registered, host validation succeeds, the four named workloads are visible, and the assessment exists with reviewed readiness. Continue to [Module 2](Module-2-Agentless-Migration.md).
+**Pass gate:** the appliance is registered, host validation succeeds, the four named workloads are visible, and the assessment exists with reviewed readiness. Continue to [Module 2](Module-2-HyperV-Migration.md).
