@@ -777,21 +777,74 @@ try {
         $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-        $sqlSseiUrl = "https://download.microsoft.com/download/5/1/4/5145fe04-4d30-4b85-b0d1-39533663a2f1/SQL2022-SSEI-Expr.exe"
+        # The older Download Center package is rejected by Microsoft's current bootstrap manifest.
+        # This is the version-specific SQL 2022 package, not a generic latest-SQL redirect.
+        $sqlSseiUrl = "https://download.microsoft.com/download/e5d37105-aa68-4488-8ed5-b579e3809ea1/SQL2022-SSEI-Expr.exe"
+        $sqlBootstrapManifestUrl = "https://download.microsoft.com/download/e5d37105-aa68-4488-8ed5-b579e3809ea1/Manifest_Bootstrap_All.xml"
         $sqlSsei = "C:\Temp\SQL2022-SSEI-Expr.exe"
-        $sqlMediaPath = "C:\Temp\SqlExpress"
+        $sqlBootstrapManifestPath = "C:\Temp\SQL2022-Bootstrap-Manifest.xml"
+
+        function Assert-LabSqlInstaller {
+            param($VersionInfo, $Signature, [string]$ManifestText)
+            if ($null -eq $Signature -or $Signature.Status -ne 'Valid' -or $null -eq $Signature.SignerCertificate -or
+                $Signature.SignerCertificate.Subject -notmatch '(?:^|,\s*)O=Microsoft Corporation(?:,|$)') {
+                throw 'SQL installer signature is invalid or is not from Microsoft Corporation. The installer was not started.'
+            }
+            if ($null -eq $VersionInfo -or $VersionInfo.OriginalFilename -cne 'SQL2022-SSEI-Expr.exe' -or $VersionInfo.FileMajorPart -ne 16) {
+                throw 'The downloaded package is not the expected SQL Server 2022 Express installer. The installer was not started.'
+            }
+            $actual = [version]::new($VersionInfo.FileMajorPart,$VersionInfo.FileMinorPart,$VersionInfo.FileBuildPart,$VersionInfo.FilePrivatePart)
+            # Read only the published version fields; never process DTDs or external XML entities.
+            $settings = [Xml.XmlReaderSettings]::new()
+            $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+            $settings.XmlResolver = $null
+            $settings.MaxCharactersInDocument = 1MB
+            $reader = $null; $textReader = $null
+            try {
+                $textReader = [IO.StringReader]::new($ManifestText)
+                $reader = [Xml.XmlReader]::Create($textReader,$settings)
+                $manifest = [Xml.XmlDocument]::new()
+                $manifest.XmlResolver = $null
+                $manifest.Load($reader)
+                $namespaces = [Xml.XmlNamespaceManager]::new($manifest.NameTable)
+                $namespaces.AddNamespace('m','http://schemas.datacontract.org/2004/07/InstallerEngine')
+                $namespaces.AddNamespace('s','http://schemas.datacontract.org/2004/07/System')
+                $parts = @(foreach ($name in @('_Major','_Minor','_Build','_Revision')) {
+                    $nodes = $manifest.SelectNodes("/m:Manifest/m:SupportedEngineVersion/s:$name",$namespaces)
+                    if ($nodes.Count -ne 1 -or $nodes[0].InnerText -notmatch '^\d{1,5}$' -or [int]$nodes[0].InnerText -gt 65535) {
+                        throw 'Missing or invalid version field.'
+                    }
+                    [int]$nodes[0].InnerText
+                })
+                $minimum = [version]::new($parts[0],$parts[1],$parts[2],$parts[3])
+                if ($minimum.Major -ne 16) { throw 'Unexpected SQL major version.' }
+            } catch {
+                throw 'Could not verify the SQL Server 2022 bootstrap manifest. Check the download endpoint or obtain a reviewed workshop update; the installer was not started.'
+            } finally {
+                if ($null -ne $reader) { $reader.Dispose() }
+                if ($null -ne $textReader) { $textReader.Dispose() }
+            }
+            if ($actual -lt $minimum) {
+                throw "SQL Server 2022 Express installer version $actual is below Microsoft's required minimum $minimum. Obtain the current SQL 2022 installer; the installer was not started."
+            }
+            return [pscustomobject]@{ Version=$actual.ToString(); MinimumVersion=$minimum.ToString() }
+        }
 
         New-Item -ItemType Directory -Path "C:\Temp" -Force | Out-Null
-        New-Item -ItemType Directory -Path $sqlMediaPath -Force | Out-Null
 
         $sqlService = Get-Service -Name "MSSQL`$SQLEXPRESS" -ErrorAction SilentlyContinue
         if (-not $sqlService) {
             Write-Output "Downloading SQL Server 2022 Express installer..."
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            try {
+                Invoke-WebRequest -Uri $sqlBootstrapManifestUrl -OutFile $sqlBootstrapManifestPath -UseBasicParsing -ErrorAction Stop -TimeoutSec 60
+                $bootstrapManifestText = Get-Content -LiteralPath $sqlBootstrapManifestPath -Raw -Encoding UTF8 -ErrorAction Stop
+            } catch { throw 'Could not retrieve the SQL Server 2022 bootstrap manifest. Check outbound HTTPS/proxy access; the installer was not started.' }
             Invoke-WebRequest -Uri $sqlSseiUrl -OutFile $sqlSsei -UseBasicParsing -ErrorAction Stop -TimeoutSec 300
 
             $signature = Get-AuthenticodeSignature $sqlSsei
-            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'SQL installer signature is invalid.' }
+            $installerInfo = Assert-LabSqlInstaller -VersionInfo (Get-Item -LiteralPath $sqlSsei).VersionInfo -Signature $signature -ManifestText $bootstrapManifestText
+            Write-Output "Verified Microsoft SQL 2022 Express installer $($installerInfo.Version); required minimum $($installerInfo.MinimumVersion)."
             $install = Start-Process -FilePath $sqlSsei -ArgumentList '/ACTION=Install /QUIET /IACCEPTSQLSERVERLICENSETERMS' -PassThru
             $null = $install.Handle
             if (-not $install.WaitForExit(3600000)) {

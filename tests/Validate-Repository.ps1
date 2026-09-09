@@ -501,5 +501,8 @@ Check 'Deployment health monitoring handles failure timeout recovery and protect
 Check 'Installation display preserves progress status warnings and plain logs' {
     & "$PSScriptRoot/Test-InstallProgress.ps1"
 }
+Check 'SQL installer identity signature and minimum version are verified before launch' {
+    & "$PSScriptRoot/Test-SqlInstaller.ps1"
+}
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count local checks passed. Azure/Hyper-V execution has not been tested."

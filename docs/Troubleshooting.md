@@ -25,6 +25,22 @@ Start with the first failed stage. Record the exact repository revision, run ID,
 
 Reports live under `rehearsal-evidence/current/` by default. Exit code `0` means all stages completed with instructor evidence; `1` means failure/review is required; `2` means paused. A pause or closed window does not stop billable Azure resources. See the [complete launcher guide](Automated-Rehearsal.md).
 
+## SQL 2022 installer says its version is no longer supported
+
+The affected SQL Express bootstrapper reports version `16.2211.5693.3`, while Microsoft's SQL 2022 bootstrap manifest requires at least `16.2607.0.1` as of September 9, 2026. This failure occurs before the SQL engine installation. These are bootstrapper versions, not the installed database-engine version.
+
+The older Download Center link still served the rejected file when checked. Use the [updated Microsoft SQL Server 2022 Express installer](https://download.microsoft.com/download/e5d37105-aa68-4488-8ed5-b579e3809ea1/SQL2022-SSEI-Expr.exe). The workshop now checks its Microsoft signature, SQL 2022 package identity and version against the [current SQL 2022 bootstrap manifest](https://download.microsoft.com/download/e5d37105-aa68-4488-8ed5-b579e3809ea1/Manifest_Bootstrap_All.xml) before launching it. A changed or unreadable manifest stops setup with a specific error.
+
+For an existing failed `OnPrem-SQL`, retain the SSEI logs and confirm the previous installer and `ConfigureWorkshop` have stopped before attempting installation again. Replace the old installer file inside that VM with the updated package and verify its Microsoft signature and version. Install the `SQLEXPRESS` instance, then complete the SQL network configuration, `ContosoApp` sample database and [local workload checks](Module-0-Setup.md#5-verify-inside-hypervhost). Installing the SQL engine alone does not finish the lab. Preserve the failed rehearsal record; use a fresh checkout/run for automated validation rather than replaying deployment into existing groups.
+
+To verify the current download from a Windows checkout without installing SQL or accessing Azure:
+
+```powershell
+.\tests\Test-SqlInstaller.ps1 -VerifyDownload
+```
+
+This downloads a temporary copy, checks its signature/version and the manifest, prints the version and SHA-256, then removes only its temporary files.
+
 ## Long-running deployment
 
 Do not wait for the entire workshop timeout after an operation reports failure. The deployment monitor checks job results and managed Run Command execution separately: Azure accepting a command is not proof that the script or samples succeeded. [Microsoft's managed Run Command status guidance](https://learn.microsoft.com/azure/virtual-machines/windows/run-command-managed) distinguishes extension provisioning from script execution and exposes the latest available output.

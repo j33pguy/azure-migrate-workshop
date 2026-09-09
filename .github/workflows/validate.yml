@@ -36,3 +36,6 @@ jobs:
       - name: Validate installation display with PowerShell 7 on Windows
         shell: pwsh
         run: .\tests\Test-InstallProgress.ps1
+      - name: Verify the current signed SQL 2022 download without executing it
+        shell: powershell
+        run: .\tests\Test-SqlInstaller.ps1 -VerifyDownload
