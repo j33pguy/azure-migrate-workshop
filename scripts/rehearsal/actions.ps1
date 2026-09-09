@@ -32,13 +32,10 @@ function Test-RehearsalAzurePrerequisites {
         $records=@(Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop)
         if (-not $records.Count -or @($records | Where-Object RegistrationState -NE 'Registered').Count) { throw "Provider $provider is not registered. Resolve registration separately before provisioning." }
     }
-    $sku=@(Get-AzComputeResourceSku -Location $Config.Location -ErrorAction Stop | Where-Object { $_.ResourceType -eq 'virtualMachines' -and $_.Name -eq $Config.VMSize })
-    if ($sku.Count -ne 1 -or @($sku[0].Restrictions | Where-Object Type -EQ 'Location').Count) { throw 'Selected host size is unavailable in this subscription/region.' }
-    $cores=[int]($sku[0].Capabilities | Where-Object Name -EQ 'vCPUs').Value
-    $quotas=@(Get-AzVMUsage -Location $Config.Location -ErrorAction Stop | Where-Object { $_.Name.Value -in @($sku[0].Family,'cores') })
-    if ($cores -le 0 -or $quotas.Count -lt 2) { throw 'Could not verify host vCPU requirements and quotas.' }
-    foreach ($quota in $quotas) { if ($quota.Limit - $quota.CurrentValue -lt $cores) { throw "Insufficient host quota: $($quota.Name.LocalizedValue)." } }
-    Write-Host 'Host SKU and quota checks passed. Target/test sizes, policy, licensing and download access still require the environment checkpoint.'
+    $hostSku=Get-LabHostSku -VMSize $Config.VMSize -Location $Config.Location
+    $null=Get-LabWindowsImages -Location $Config.Location
+    Write-Host "Selected host $($hostSku.Name): $($hostSku.Cores) enabled vCPUs, $($hostSku.MemoryGB) GiB RAM. SKU, quota and Windows image checks passed."
+    Write-Host 'Confirm nested virtualization support for this series in Microsoft documentation at the environment checkpoint. Target/test capacity, policy, licensing and download access also require instructor verification.'
 }
 
 function Get-RehearsalVMMap {

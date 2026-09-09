@@ -5,7 +5,7 @@ function Get-RehearsalPlan {
     $rows = @(
         @('local-checks','Check workshop scripts','Automatic','','Run the local PowerShell regression suite.','Safe'),
         @('azure-preflight','Check Azure subscription and source capacity','Automatic','Module-0-Setup.md','Check the exact tenant/subscription, modules, providers, unused group names and source-host quota.','Safe'),
-        @('environment-review','Record instructor preparation','Checkpoint','Module-0-Setup.md','Record pricing estimate, spending alert and cleanup deadline, licensing, policy/RDP/download access and target/test capacity review.','Safe'),
+        @('environment-review','Record instructor preparation','Checkpoint','Module-0-Setup.md','Record the selected host size and Microsoft series documentation confirming nested virtualization with Standard security, pricing estimate, spending alert and cleanup deadline, licensing, policy/RDP/download access and target/test capacity review.','Safe'),
         @('deploy-source','Deploy Hyper-V host and five guests','Provision','Module-0-Setup.md','Creates billable source resources and waits for source workload readiness.','Unsafe'),
         @('source-review','Record source image and network evidence','Checkpoint','Module-0-Setup.md','Record setup-complete.json, guest/image/package versions, DHCP, source endpoint checks and free host disk/RAM.','Safe'),
         @('target-networks','Create isolated target and test networks','Provision','Module-0-Setup.md','Creates billable target resources including two NAT gateways and public IPs.','Unsafe'),
@@ -72,7 +72,7 @@ function Read-RehearsalConfiguration {
     if ($config.Location -notmatch '^[a-z][a-z0-9]+$') { throw 'Use the Azure region identifier, for example eastus.' }
     if ($config.AdminUsername -notmatch '^[a-z][a-z0-9]{2,18}$' -or $config.AdminUsername -in @('admin','administrator','root','guest','user','test')) { throw 'Choose a non-reserved lab administrator name, such as labadmin.' }
     Assert-LabAdminSource $config.AdminSourceCidr
-    if ($config.VMSize -notin @('Standard_E8s_v5','Standard_E16s_v5')) { throw 'Unsupported nested Hyper-V host size.' }
+    Assert-LabHostSizeName $config.VMSize
     return $config
 }
 
