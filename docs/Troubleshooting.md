@@ -29,9 +29,14 @@ Reports live under `rehearsal-evidence/current/` by default. Exit code `0` means
 
 Do not wait for the entire workshop timeout after an operation reports failure. The deployment monitor checks job results and managed Run Command execution separately: Azure accepting a command is not proof that the script or samples succeeded. [Microsoft's managed Run Command status guidance](https://learn.microsoft.com/azure/virtual-machines/windows/run-command-managed) distinguishes extension provisioning from script execution and exposes the latest available output.
 
+The interactive progress pane updates in place while operation changes and results remain in console history. It shows the numbered step, elapsed time and deadline; these are not estimates of time remaining. Yellow warnings or unavailable status and red failures also carry written status labels. The guest phase and its timestamp are the latest report received from Azure, which can buffer output. A measured percentage is available for the Ubuntu download when its byte total is known; other installers and Azure operations can remain indeterminate until completion.
+
+If your terminal does not display progress correctly, set `$env:CES_LAB_PROGRESS = 'plain'` in PowerShell before launching `.\Start-Rehearsal.cmd`. This preserves periodic text updates; redirected output and CI use them automatically. Set `NO_COLOR` to disable message colors. The [local display demo](../scripts/Show-LabProgressDemo.ps1) previews simulated steps without accessing Azure. See [deployment progress](Automated-Rehearsal.md#progress-during-deployment) for commands and the unchanged JSON status-file locations.
+
 | Observation | What happens / next action |
 |---|---|
 | Operation is `Running` with increasing elapsed time | The client is alive and waiting. A running process can still be stalled; inspect its phase and operation-specific deadline. |
+| The guest phase or download percentage has not changed | Compare the last reported timestamp and inspect the host logs. Azure can buffer output, so an unchanged display alone does not establish a stall. Windows image download and SQL installation do not supply a measured percentage. |
 | Setup reports `Failed`, `TimedOut` or cancellation, or extension provisioning fails | The runner stops at the next observation and retains `ConfigureWorkshop` for diagnostics. Start with its exit code/error and the host setup log. |
 | `StatusUnavailable` persists for five minutes | Monitoring stops instead of retrying for four hours. Check Azure sign-in, connectivity, VM agent and the command directly. The remote script may still be running. |
 | Setup has no `Running` state after 15 minutes | Review VM-agent and command provisioning. The command might start later; do not submit it again. |

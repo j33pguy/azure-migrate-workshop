@@ -19,6 +19,10 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/health.ps1"
+Initialize-LabProgress -Activity 'TD SYNNEX | Target/test networks' -Steps @(
+    'Target/test networks', 'Create target egress IP', 'Create target NAT gateway', 'Create target firewall rules', 'Create target VNet',
+    'Create test egress IP', 'Create test NAT gateway', 'Create test firewall rules', 'Create test VNet'
+)
 if (-not $HealthPath) { $HealthPath = Join-Path $PSScriptRoot "../.artifacts/network-health-$TargetResourceGroup.json" }
 $null = Assert-LabContext $SubscriptionId
 $null = Assert-LabResourceGroup $SourceResourceGroup
@@ -46,9 +50,9 @@ foreach ($network in @(@{Name='target';Prefix='10.1'},@{Name='test';Prefix='10.2
 }
 Write-Host 'Target/test networks created with explicit egress. They have no peering to each other or the source.'
 Write-Host 'Create the Azure Migrate project in the source resource group using docs/Module-1-Discovery.md.'
-Write-LabHealth 'Target/test networks' Completed $clock.Elapsed.TotalSeconds 'Network creation returned successfully. Continue with project setup and the migration runbook.' $HealthPath
+Write-LabHealth 'Network setup complete' Completed $clock.Elapsed.TotalSeconds 'Network creation returned successfully. Continue with project setup and the migration runbook.' $HealthPath
 } catch {
     try { Write-LabHealth 'Target/test networks' NeedsReview $clock.Elapsed.TotalSeconds 'Network creation failed or exceeded its limit. Inspect Azure before retrying into this resource group.' $HealthPath }
     catch { Write-Warning 'Could not update network health summary.' }
     throw
-}
+} finally { Complete-LabProgress }
