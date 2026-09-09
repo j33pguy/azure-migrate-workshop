@@ -144,25 +144,70 @@ function Get-LabHostSku {
         AcceleratedNetworking=($capabilities['AcceleratedNetworkingEnabled'] -eq 'True') }
 }
 
+function Invoke-LabImageCatalogGet {
+    param([Parameter(Mandatory)][string]$Path)
+    # Keep image catalog requests on an explicitly supported API instead of
+    # inheriting the installed Az.Compute SDK's default version.
+    $response=Invoke-AzRestMethod -Path "$Path`?api-version=2025-04-01" -Method GET -ErrorAction Stop
+    if ($null -eq $response -or [string]::IsNullOrWhiteSpace($response.Content)) { throw "No verifiable Windows image catalog response for '$Path'." }
+    $body=ConvertFrom-Json -InputObject $response.Content -ErrorAction Stop
+    if ($response.StatusCode -ne 200) {
+        $code='Unknown'
+        if ($null -ne $body -and $body.PSObject.Properties['error'] -and $null -ne $body.error -and $body.error.PSObject.Properties['code']) { $code=[string]$body.error.code }
+        throw "Windows image catalog lookup failed: HTTP $($response.StatusCode), code '$code', API 2025-04-01, path '$Path'. Resolve image catalog access before deploying."
+    }
+    return $body
+}
+
 function Get-LabWindowsImages {
     param([Parameter(Mandatory)][string]$Location)
+    $context=Get-AzContext -ErrorAction Stop
+    if (-not $context -or -not $context.Subscription -or [string]::IsNullOrWhiteSpace($context.Subscription.Id)) { throw 'Select the intended Azure subscription before resolving Windows images.' }
+    $subscription=[uri]::EscapeDataString($context.Subscription.Id)
+    $region=[uri]::EscapeDataString($Location)
     $images = @{}
     foreach ($role in @('Host','Guest')) {
         $sku = if ($role -eq 'Host') { '2022-datacenter-g2' } else { '2022-datacenter-smalldisk-g2' }
         $offer = 'windowsserver2022'
-        $versions = @(Get-AzVMImage -Location $Location -PublisherName MicrosoftWindowsServer -Offer $offer -Skus $sku -ErrorAction Stop)
+        $catalog="/subscriptions/$subscription/providers/Microsoft.Compute/locations/$region/publishers/MicrosoftWindowsServer/artifacttypes/vmimage/offers/$offer/skus/$sku/versions"
+        $versions = @(Invoke-LabImageCatalogGet $catalog)
         if (-not $versions.Count) { throw "No Windows image versions found: MicrosoftWindowsServer:${offer}:${sku} in '$Location'. Verify region, offer and image access before deploying." }
-        $version = $versions | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
-        $details = @(Get-AzVMImage -Location $Location -PublisherName MicrosoftWindowsServer -Offer $offer -Skus $sku -Version $version.Version -ErrorAction Stop)
-        if ($details.Count -ne 1 -or $details[0].HyperVGeneration -ne 'V2' -or
-            $details[0].Architecture -ne 'x64' -or $details[0].OSDiskImage.OperatingSystem -ne 'Windows' -or
-            [string]::IsNullOrWhiteSpace($details[0].Id)) {
-            throw "Cannot verify a Windows x64 Gen2 image for ${offer}:${sku}:$($version.Version) in '$Location'."
+        foreach ($entry in $versions) {
+            $parsed=$null
+            if (-not $entry.PSObject.Properties['name'] -or $entry.name -notmatch '^\d+\.\d+\.\d+$' -or
+                -not [version]::TryParse($entry.name,[ref]$parsed)) { throw "Invalid Windows image version metadata for ${offer}:${sku} in '$Location'." }
         }
-        $images[$role] = [pscustomobject]@{ Publisher='MicrosoftWindowsServer'; Offer=$offer; Sku=$sku; Version=$version.Version; Id=$details[0].Id }
-        Write-Host "Resolved $role image: MicrosoftWindowsServer:${offer}:${sku}:$($version.Version)"
+        $version=($versions | Sort-Object { [version]$_.name } -Descending | Select-Object -First 1).name
+        $imageId="$catalog/$version"
+        $details = @(Invoke-LabImageCatalogGet $imageId)
+        if ($details.Count -ne 1 -or -not $details[0].PSObject.Properties['id'] -or
+            [uri]::UnescapeDataString($details[0].id) -ne [uri]::UnescapeDataString($imageId) -or
+            -not $details[0].PSObject.Properties['properties'] -or $null -eq $details[0].properties) {
+            throw "Cannot verify the Windows image identity for ${offer}:${sku}:${version} in '$Location'."
+        }
+        $properties=$details[0].properties
+        if (-not $properties.PSObject.Properties['hyperVGeneration'] -or $properties.hyperVGeneration -ne 'V2' -or
+            -not $properties.PSObject.Properties['architecture'] -or $properties.architecture -ne 'x64' -or
+            -not $properties.PSObject.Properties['osDiskImage'] -or $null -eq $properties.osDiskImage -or
+            -not $properties.osDiskImage.PSObject.Properties['operatingSystem'] -or $properties.osDiskImage.operatingSystem -ne 'Windows') {
+            throw "Cannot verify a Windows x64 Gen2 image for ${offer}:${sku}:${version} in '$Location'."
+        }
+        $images[$role] = [pscustomobject]@{ Publisher='MicrosoftWindowsServer'; Offer=$offer; Sku=$sku; Version=$version; Id=$imageId }
+        Write-Host "Resolved $role image: MicrosoftWindowsServer:${offer}:${sku}:${version} (catalog API 2025-04-01)"
     }
     return [pscustomobject]$images
+}
+
+function New-LabWindowsGuestDiskConfig {
+    param([Parameter(Mandatory)][string]$Location, [Parameter(Mandatory)][string]$ImageId)
+    $disk=New-AzDiskConfig -Location $Location -CreateOption FromImage -HyperVGeneration V2 -OsType Windows -ImageReference @{Id=$ImageId} -ErrorAction Stop
+    # Standard prevents New-AzDisk's implicit Trusted Launch image lookup and
+    # prepares an ordinary OS disk for export to the nested Hyper-V guests.
+    $disk=Set-AzDiskSecurityProfile -Disk $disk -SecurityType Standard -ErrorAction Stop
+    if ($null -eq $disk -or $null -eq $disk.SecurityProfile -or $disk.SecurityProfile.SecurityType -ne 'Standard') {
+        throw 'Az.Compute did not retain Standard security on the temporary guest disk configuration. Update the module before deployment.'
+    }
+    return $disk
 }
 
 function Read-LabHostConfiguration {

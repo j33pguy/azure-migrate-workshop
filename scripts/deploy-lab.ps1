@@ -42,6 +42,7 @@ if (@($classes).Count -lt 3) { throw 'The password must include at least three c
 if (Get-LabResourceGroup -Name $ResourceGroupName -AllowMissing) { throw 'Use a new, dedicated source resource group. Deployment is not a post-migration repair command.' }
 $hostSku = Get-LabHostSku -VMSize $VMSize -Location $Location
 $windowsImages = Get-LabWindowsImages -Location $Location
+$guestDiskConfig = New-LabWindowsGuestDiskConfig -Location $Location -ImageId $windowsImages.Guest.Id
 Write-Host "Selected host: $($hostSku.Name), $($hostSku.Cores) enabled vCPUs, $($hostSku.MemoryGB) GiB RAM. Confirm this series supports nested virtualization with Standard security before running deployment."
 foreach ($provider in @('Microsoft.Compute','Microsoft.Network','Microsoft.Storage','Microsoft.Migrate','Microsoft.OffAzure','Microsoft.RecoveryServices','Microsoft.KeyVault')) {
     $state = @(Get-AzResourceProvider -ProviderNamespace $provider)[0].RegistrationState
@@ -91,8 +92,7 @@ Write-Output 'HYPERV_INSTALLED'
         } catch { Write-Host 'Waiting for the VM agent and Hyper-V service...' }
     }
     if (-not $ready) { throw 'Hyper-V host did not become ready.' }
-    $diskConfig = New-AzDiskConfig -Location $Location -CreateOption FromImage -HyperVGeneration V2 -OsType Windows -ImageReference @{ Id = $windowsImages.Guest.Id }
-    New-AzDisk -ResourceGroupName $ResourceGroupName -DiskName $diskName -Disk $diskConfig | Out-Null
+    New-AzDisk -ResourceGroupName $ResourceGroupName -DiskName $diskName -Disk $guestDiskConfig | Out-Null
     $diskCreated = $true
     $access = Grant-AzDiskAccess -ResourceGroupName $ResourceGroupName -DiskName $diskName -Access Read -DurationInSecond 18000
     $parameters = @(@{ Name = 'AdminUsername'; Value = $AdminUsername })
