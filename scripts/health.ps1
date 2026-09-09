@@ -141,6 +141,9 @@ function Invoke-LabProcess {
     $log = Join-Path $LogDirectory ('process-' + [guid]::NewGuid().ToString('N'))
     $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -PassThru -ErrorAction Stop `
         -RedirectStandardOutput ($log + '.out.log') -RedirectStandardError ($log + '.err.log')
+    # Windows PowerShell may return a process wrapper without an open handle.
+    # Hold it before exit so the exit code remains available after termination.
+    $null = $process.Handle
     $clock = [Diagnostics.Stopwatch]::StartNew()
     try {
         while (-not $process.HasExited) {
@@ -151,7 +154,6 @@ function Invoke-LabProcess {
             }
             Write-LabHealth $Stage Running $clock.Elapsed.TotalSeconds 'Process is present; completion and exit code are still required.'
             $null = $process.WaitForExit([int]([math]::Min(30,[math]::Max(1,$TimeoutSeconds - $clock.Elapsed.TotalSeconds)) * 1000))
-            $process.Refresh()
         }
         # Ensure redirected streams are drained before checking the exit code.
         $process.WaitForExit()

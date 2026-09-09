@@ -792,11 +792,11 @@ Set-StrictMode -Version Latest
             $signature = Get-AuthenticodeSignature $sqlSsei
             if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'SQL installer signature is invalid.' }
             $install = Start-Process -FilePath $sqlSsei -ArgumentList '/ACTION=Install /QUIET /IACCEPTSQLSERVERLICENSETERMS' -PassThru
+            $null = $install.Handle
             if (-not $install.WaitForExit(3600000)) {
                 & taskkill.exe /PID $install.Id /T /F 2>&1 | Out-Null
                 throw 'SQL Express installation exceeded 60 minutes. Inspect SQL Setup Bootstrap logs before retrying.'
             }
-            $install.Refresh()
             if ($install.ExitCode -notin @(0,3010)) { throw "SQL Express installer failed: $($install.ExitCode)" }
             if (-not (Get-Service 'MSSQL$SQLEXPRESS' -ErrorAction SilentlyContinue)) { throw 'SQLEXPRESS service not found after installation.' }
         } else {
