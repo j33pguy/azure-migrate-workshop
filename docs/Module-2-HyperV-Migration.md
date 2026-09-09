@@ -56,7 +56,7 @@ Select the four workload names and review every target setting:
 
 Start replication and monitor the job. Initial replication must finish before test migration; delta replication continues afterwards. A job being accepted is not proof that replication is healthy. Record healthy status, replication lag/last synchronization and any warnings per VM. The portal may label the stages **Preparation**, **Testing**, and **Completion**, or use the classic **Replicating machines** view.
 
-If initial replication fails, inspect the **host provider** and its Azure URL access, cache storage settings, source disks, quotas and service errors. A Linux guest's inability to reach a hypothetical process server on port 9443 is not the troubleshooting path for this Hyper-V lab.
+If initial replication fails, inspect the **host provider** and its Azure URL access, cache storage settings, source disks, quotas and per-VM service errors.
 
 ## 4. Run isolated test migrations
 

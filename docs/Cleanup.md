@@ -14,7 +14,7 @@ Get-AzResource -ResourceGroupName $sourceRg | Select-Object Name,ResourceType,Re
 Get-AzResource -ResourceGroupName $targetRg | Select-Object Name,ResourceType,ResourceId
 ```
 
-The cleanup script only accepts exact group names tagged `Workshop=TD-SYNNEX-CES-HyperV`. Wildcards such as `rg-ces-*`, resource IDs and names containing whitespace are rejected before any group lookup. An old lab created by the original scripts lacks this tag. Inspect its entire inventory and use an explicit manual cleanup decision; do not blindly tag an existing group just to bypass the guard.
+The cleanup script only accepts exact group names tagged `Workshop=TD-SYNNEX-CES-HyperV`. Wildcards such as `rg-ces-*`, resource IDs and names containing whitespace are rejected before any group lookup. For an untagged group, inspect its entire inventory and make an explicit manual cleanup decision; do not blindly tag an existing group just to bypass the guard.
 
 ## 2. Remove service-managed state first
 

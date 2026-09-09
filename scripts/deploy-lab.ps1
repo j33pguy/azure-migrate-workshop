@@ -20,12 +20,13 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[a-z][a-z0-9]{2,18}$')][string]$AdminUsername,
     [Parameter(Mandatory)][SecureString]$AdminPassword,
     [Parameter(Mandatory)][string]$AdminSourceCidr,
-    [ValidateSet('Standard_E8s_v5','Standard_E16s_v5')][string]$VMSize = 'Standard_E8s_v5'
+    [string]$VMSize = 'Standard_E8s_v5'
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/common.ps1"
 $hostScript = Read-LabHostConfiguration "$PSScriptRoot/host/configure-host.ps1"
 Assert-LabAdminSource $AdminSourceCidr
+Assert-LabHostSizeName $VMSize
 foreach ($module in @('Az.Accounts','Az.Resources','Az.Network','Az.Compute')) {
     Import-Module $module -ErrorAction Stop
 }
@@ -39,12 +40,9 @@ if ($passwordPlain.Length -lt 12 -or $passwordPlain.Length -gt 72 -or $passwordP
 $classes = @('[a-z]','[A-Z]','[0-9]','[^a-zA-Z0-9]') | Where-Object { $passwordPlain -cmatch $_ }
 if (@($classes).Count -lt 3) { throw 'The password must include at least three character categories: lower, upper, number, symbol.' }
 if (Get-LabResourceGroup -Name $ResourceGroupName -AllowMissing) { throw 'Use a new, dedicated source resource group. Deployment is not a post-migration repair command.' }
-$sku = @(Get-AzComputeResourceSku -Location $Location | Where-Object { $_.ResourceType -eq 'virtualMachines' -and $_.Name -eq $VMSize })
-if ($sku.Count -ne 1 -or @($sku[0].Restrictions | Where-Object Type -EQ 'Location').Count -gt 0) { throw "VM size unavailable for this subscription/region: $VMSize in $Location." }
-$cores = [int]($sku[0].Capabilities | Where-Object Name -EQ 'vCPUs').Value
-$quota = @(Get-AzVMUsage -Location $Location | Where-Object { $_.Name.Value -in @($sku[0].Family,'cores') })
-if ($quota.Count -lt 2) { throw 'Could not verify regional and VM-family vCPU quotas.' }
-foreach ($q in $quota) { if ($q.Limit - $q.CurrentValue -lt $cores) { throw "Insufficient quota: $($q.Name.LocalizedValue). Need $cores free vCPUs plus separate target/test quota." } }
+$hostSku = Get-LabHostSku -VMSize $VMSize -Location $Location
+$windowsImages = Get-LabWindowsImages -Location $Location
+Write-Host "Selected host: $($hostSku.Name), $($hostSku.Cores) enabled vCPUs, $($hostSku.MemoryGB) GiB RAM. Confirm this series supports nested virtualization with Standard security before running deployment."
 foreach ($provider in @('Microsoft.Compute','Microsoft.Network','Microsoft.Storage','Microsoft.Migrate','Microsoft.OffAzure','Microsoft.RecoveryServices','Microsoft.KeyVault')) {
     $state = @(Get-AzResourceProvider -ProviderNamespace $provider)[0].RegistrationState
     if ($state -ne 'Registered') { throw "Register $provider first with Register-AzResourceProvider and wait until Registered." }
@@ -65,10 +63,10 @@ try {
     $pip = New-AzPublicIpAddress -Name "$vmName-pip" -ResourceGroupName $ResourceGroupName -Location $Location -AllocationMethod Static -Sku Standard
     $rdp = New-AzNetworkSecurityRuleConfig -Name Allow-RDP -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix $AdminSourceCidr -SourcePortRange '*' -DestinationAddressPrefix '*' -DestinationPortRange 3389
     $nsg = New-AzNetworkSecurityGroup -Name "$vmName-nsg" -ResourceGroupName $ResourceGroupName -Location $Location -SecurityRules $rdp
-    $nic = New-AzNetworkInterface -Name "$vmName-nic" -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $vnet.Subnets[0].Id -PublicIpAddressId $pip.Id -NetworkSecurityGroupId $nsg.Id
+    $nic = New-AzNetworkInterface -Name "$vmName-nic" -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $vnet.Subnets[0].Id -PublicIpAddressId $pip.Id -NetworkSecurityGroupId $nsg.Id -EnableAcceleratedNetworking:$hostSku.AcceleratedNetworking
     $vm = New-AzVMConfig -VMName $vmName -VMSize $VMSize -SecurityType Standard
     $vm = Set-AzVMOperatingSystem -VM $vm -Windows -ComputerName $vmName -Credential $credential -ProvisionVMAgent -EnableAutoUpdate
-    $vm = Set-AzVMSourceImage -VM $vm -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2022-datacenter-g2 -Version latest
+    $vm = Set-AzVMSourceImage -VM $vm -PublisherName $windowsImages.Host.Publisher -Offer $windowsImages.Host.Offer -Skus $windowsImages.Host.Sku -Version $windowsImages.Host.Version
     $vm = Set-AzVMOSDisk -VM $vm -Name "$vmName-osdisk" -CreateOption FromImage -StorageAccountType Premium_LRS -DiskSizeInGB 512
     $vm = Add-AzVMNetworkInterface -VM $vm -Id $nic.Id
     $vm = Set-AzVMBootDiagnostic -VM $vm -Enable
@@ -93,10 +91,7 @@ Write-Output 'HYPERV_INSTALLED'
         } catch { Write-Host 'Waiting for the VM agent and Hyper-V service...' }
     }
     if (-not $ready) { throw 'Hyper-V host did not become ready.' }
-    $image = Get-AzVMImage -Location $Location -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2022-datacenter-smalldisk-g2 |
-        Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
-    if (-not $image) { throw 'Windows guest image not found.' }
-    $diskConfig = New-AzDiskConfig -Location $Location -CreateOption FromImage -HyperVGeneration V2 -OsType Windows -ImageReference @{ Id = $image.Id }
+    $diskConfig = New-AzDiskConfig -Location $Location -CreateOption FromImage -HyperVGeneration V2 -OsType Windows -ImageReference @{ Id = $windowsImages.Guest.Id }
     New-AzDisk -ResourceGroupName $ResourceGroupName -DiskName $diskName -Disk $diskConfig | Out-Null
     $diskCreated = $true
     $access = Grant-AzDiskAccess -ResourceGroupName $ResourceGroupName -DiskName $diskName -Access Read -DurationInSecond 18000

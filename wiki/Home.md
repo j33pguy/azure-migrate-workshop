@@ -4,7 +4,7 @@
 
 Discover, assess, test and migrate four Hyper-V workloads to Azure, validate the applications and SQL data, and account for all resources at the end. This course uses Hyper-V throughout. The discovery appliance assesses the environment; the replication provider installed on the Hyper-V host moves the VM data.
 
-**Delivery status:** the engineering refresh and rehearsal launcher are merged. Automated code checks pass, but a successful live Azure/Hyper-V rehearsal has not yet been recorded. Use the [instructor release checklist](../docs/Instructor-Guide.md) before partner delivery and keep every participant on the same validated revision.
+**Delivery status:** awaiting live Azure/Hyper-V rehearsal. Check the [automated validation results](https://github.com/j33pguy/azure-migrate-workshop/actions/workflows/validate.yml) for your revision, complete the [instructor release checklist](../docs/Instructor-Guide.md) before partner delivery, and keep every participant on the same validated revision.
 
 ## Choose your starting point
 
@@ -23,7 +23,7 @@ Discover, assess, test and migrate four Hyper-V workloads to Azure, validate the
 |---|---|---|
 | 0 | [Prepare and deploy](../docs/Module-0-Setup.md) | Five nested VMs and four healthy workloads |
 | 1 | [Discover and assess](../docs/Module-1-Discovery.md) | Correct workload inventory and reviewed assessment |
-| 2 | [Replicate and test migrate](../docs/Module-2-Agentless-Migration.md) | Healthy replication, workload/network/SQL test results and service-managed test cleanup |
+| 2 | [Replicate and test migrate](../docs/Module-2-HyperV-Migration.md) | Healthy replication, workload/network/SQL test results and service-managed test cleanup |
 | 3 | [Cut over and accept](../docs/Module-3-Stateful-Migration.md) | Source workloads off, final synchronization, independent SQL comparison and target acceptance |
 | 4 | [Compare migration and disaster recovery](../docs/Module-4-ASR-Comparison.md) | Explain the different goals and operating models |
 | 5 | [Operate the migrated environment](../docs/Module-5-Post-Migration.md) | Base acceptance/security/cost review; evidence for each included optional exercise |
@@ -39,4 +39,4 @@ Deployment creates billable resources. Provision before class, measure actual di
 
 These wiki pages are published from versioned repository sources. Their footers identify the source revision; local copies remain with the scripts so rehearsals and downloaded packages work without fetching mutable wiki content. Follow the [maintenance guide](../docs/Repository-Maintenance.md) to update and republish them.
 
-Cloud Enablement Services maintains this personal fork pending a future enterprise transfer. Official logo assets, the support contact and the original Microsoft source attribution still need confirmation. See [branding and ownership](../docs/Branding-and-Forking.md) and [release validation](../review/validation-results.md).
+Cloud Enablement Services maintains this personal fork pending a future enterprise transfer. See [branding and ownership](../docs/Branding-and-Forking.md) for release and attribution requirements.

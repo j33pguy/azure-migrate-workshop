@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--external', action='store_true')
 args = parser.parse_args()
 errors, external = [], set()
-files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md')), ROOT / 'NOTICE.md', *sorted((ROOT / 'review').glob('*.md')), *sorted((ROOT / 'wiki').glob('*.md'))]
+files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md')), ROOT / 'NOTICE.md', *sorted((ROOT / 'wiki').glob('*.md'))]
 for file in files:
     if not file.exists():
         errors.append(f'Missing document: {file.relative_to(ROOT)}')
@@ -48,9 +48,11 @@ if args.external:
             return {'url': url, 'error': str(exc)}
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(check, sorted(external)))
-    (ROOT / 'review/external-links.json').write_text(json.dumps(results, indent=2) + '\n')
+    report = ROOT / '.artifacts/external-links.json'
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(results, indent=2) + '\n')
     for result in results:
         if 'error' in result: errors.append(f"External check needs attention: {result['url']}: {result['error']}")
-    print(f'Checked {len(results)} external links; details: review/external-links.json')
+    print(f'Checked {len(results)} external links; details: {report.relative_to(ROOT)}')
 for error in errors: print(error)
 raise SystemExit(bool(errors))
