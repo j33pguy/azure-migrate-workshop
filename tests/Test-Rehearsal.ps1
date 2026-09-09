@@ -86,6 +86,18 @@ try {
             if ($guide -notin $plan.Guide) { throw "Missing guide $guide" }
         }
     }
+    Check 'Configuration preserves alternative host sizes and rejects malformed names' {
+        $path=Join-Path $suite 'host-size-config.json'
+        $candidate=$config | ConvertTo-Json | ConvertFrom-Json
+        foreach ($size in @('Standard_D16s_v5','Standard_E32s_v5','Standard_E8as_v5')) {
+            $candidate.VMSize=$size; Write-RehearsalJson $path $candidate
+            if ((Read-RehearsalConfiguration $path).VMSize -cne $size) { throw 'Selected host size was replaced.' }
+        }
+        foreach ($size in @('Standard_*',' Standard_D16s_v5','Standard_D16s_v5;whoami','')) {
+            $candidate.VMSize=$size; Write-RehearsalJson $path $candidate
+            MustThrow { Read-RehearsalConfiguration $path }
+        }
+    }
     Check 'Missing/manual evidence pauses and cannot silently pass or start provisioning' {
         $directory=New-TestRun
         $state=Invoke-RehearsalEngine $root $config $directory

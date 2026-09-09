@@ -10,6 +10,7 @@ Use the [rehearsal launcher](Automated-Rehearsal.md) to run the scripted stages 
 
 - Obtain the final fork URL, release/commit and reviewed package list. Keep every learner on the same revision.
 - Confirm subscription/tenant permissions, region capacity, host and target/test quota, Standard-security policy, public-IP limits, download access and disk-export permission.
+- Record the selected host size and its Microsoft series documentation confirming nested virtualization support. The scripts check regional availability, CPU/RAM, x64/Gen2/Premium SSD capabilities and quotas; these do not certify nested virtualization or guarantee regional capacity.
 - Check VM/OS/application licensing for the lab images through the team's normal licensing process.
 - Confirm the current instructor public `/32` address and corporate RDP path; prepare private interactive access if needed for VM-agent failures.
 - Use unique source/target group names per learner. The examples use suffix `01`; increment it or allocate unique subscriptions.

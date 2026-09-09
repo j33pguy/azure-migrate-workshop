@@ -13,7 +13,7 @@ Use a dedicated training subscription or approved training resource groups. Conf
 | Item | Workshop setting |
 |---|---|
 | Host | Windows Server 2022 Datacenter Gen2, `Standard_E8s_v5` (8 vCPU, 64 GB), 512 GB disk |
-| Optional larger host | `Standard_E16s_v5`; plan the increased cost |
+| Alternative host | A region-available x64 size with at least 8 enabled vCPUs, 64 GiB RAM, Gen2 and Premium SSD support; confirm nested virtualization for its series |
 | Host security | Explicit `Standard` for this nested lab; do not blindly change security on existing VMs |
 | Windows guests | `OnPrem-Web`, `OnPrem-SQL`; 2 vCPU, 4 GB RAM, 40 GB disk each |
 | Linux guests | Ubuntu 22.04; 2 vCPU, 2 GB RAM, 30 GB disk each |
@@ -24,7 +24,11 @@ Use a dedicated training subscription or approved training resource groups. Conf
 
 Nested vCPU allocation is oversubscribed; the appliance can have eight virtual processors because the host has eight. The host's 64 GB provides room for the appliance, workloads and Windows. [Hyper-V appliance sizing](https://learn.microsoft.com/azure/migrate/deploy-appliance-script)
 
-Check the [VM size documentation](https://learn.microsoft.com/azure/virtual-machines/sizes/memory-optimized/esv5-series) and [nested virtualization setup](https://learn.microsoft.com/virtualization/hyper-v-on-windows/user-guide/nested-virtualization). Also reserve quota for four simultaneous test VMs and, later, four migrated VMs. Their family and regional quota are separate from the host's quota.
+Set `VMSize` in `rehearsal.local.json`, or pass `-VMSize` to `deploy-lab.ps1`. The selected size is checked against the subscription's regional SKU metadata and both family and regional vCPU quotas. Errors identify the selected size and the unmet requirement; the scripts do not silently substitute another size. For example, `Standard_D16s_v5` meets the CPU/RAM requirements while `Standard_D8s_v5` has only 32 GiB RAM. Neither example guarantees availability in your subscription. [Dsv5 specifications](https://learn.microsoft.com/azure/virtual-machines/sizes/general-purpose/dsv5-series)
+
+Confirm **Nested Virtualization: Supported** in Microsoft's documentation for the selected series and record that source in the instructor environment checkpoint. Hardware/availability metadata checks alone do not establish nested virtualization support or guarantee allocation capacity. See the default [Esv5 specifications](https://learn.microsoft.com/azure/virtual-machines/sizes/memory-optimized/esv5-series) and [nested virtualization setup](https://learn.microsoft.com/virtualization/hyper-v-on-windows/user-guide/nested-virtualization). Reserve quota for four simultaneous test VMs and, later, four migrated VMs separately from the host.
+
+New deployments use publisher `MicrosoftWindowsServer`, offer `windowsserver2022`, with `2022-datacenter-g2` for the host and `2022-datacenter-smalldisk-g2` for the nested Windows base disk. Both images are resolved and checked as Windows x64 Gen2 before any resource group is created. Deployment uses those exact resolved versions and prints them for the rehearsal record. Microsoft directs users from the older `WindowsServer` offer to this replacement. [Windows Server image announcement](https://techcommunity.microsoft.com/blog/azurecompute/breaking-change-for-window-server-2022-image-users-with-net-6/4262423)
 
 ## 2. Install tools and select the subscription
 
