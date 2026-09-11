@@ -39,3 +39,7 @@ jobs:
       - name: Verify the current signed SQL 2022 download without executing it
         shell: powershell
         run: .\tests\Test-SqlInstaller.ps1 -VerifyDownload
+      - name: Verify signed appliance package extraction without installing services
+        timeout-minutes: 20
+        shell: powershell
+        run: .\tests\Test-ApplianceGatewayPackage.ps1

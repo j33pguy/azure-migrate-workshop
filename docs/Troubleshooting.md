@@ -104,6 +104,24 @@ A report stopped at `azure-preflight` has not reached that run's `deploy-source`
 
 Keep the full checkout together. The deployment validates the host payload before creating resources. Use [Module 0](Module-0-Setup.md) for the expected host/guest sizes, addresses and readiness evidence.
 
+## Appliance installer cannot find the Gateway setup program
+
+If `AzureMigrateScenarioInstaller_*.log` shows **Extracting and Installing Gateway Service** followed by **The system cannot find the file specified**, investigate the appliance installation inside **MigrateAppl**. This is before the appliance configuration manager and SQL discovery agent are installed; it is not the SQL Server engine installer on `OnPrem-SQL`.
+
+The reviewed Microsoft installer (10.3.0.0) starts `MicrosoftAzureGatewayService.exe` to extract `GATEWAYSETUPINSTALLER.EXE`, sleeps five seconds, then tries to launch that file. It does not check extraction completion, its exit code or the file's existence first. A missing file can result from slow or failed extraction, an incomplete package, or a security detection. The error alone does not establish insufficient RAM or prove a timing race.
+
+For an ongoing rehearsal, keep its original checkout and state intact. Copy just the reviewed Gateway helper into `MigrateAppl`; record the helper revision and recovery result with the discovery evidence. Replacing the runner's scripts mid-run changes its fingerprint and prevents normal resume.
+
+For a failed **unregistered** appliance setup:
+
+1. Preserve the full error and newest `C:\ProgramData\Microsoft Azure\Logs\AzureMigrateScenarioInstaller_*.log`. Confirm the failed installer and its Gateway processes have stopped before retrying. Do not restart deployment or resize VMs to clear this error.
+2. Confirm the full Microsoft ZIP was extracted locally, including `MicrosoftAzureGatewayService.exe`, and verify its hash against [Microsoft's current published package](https://learn.microsoft.com/azure/migrate/migrate-appliance#verify-security). Use a short folder such as `C:\AzureMigrateInstaller` on `MigrateAppl`.
+3. Follow [Module 1's Gateway preparation step](Module-1-Discovery.md#3-install-the-appliance-on-migrateappl). The helper verifies the signed extractor, stages a fresh extraction, waits for completion and checks the copied payload hashes. Microsoft's inner Gateway bootstrapper is unsigned; its provenance comes from the verified outer package and fresh extraction. The helper does not start Gateway setup or reinstall the appliance.
+4. If preparation fails, use its specific error: nonzero extraction exit, missing output, signature failure, or timeout. Check actual free disk space and Windows Security protection history as applicable. Do not disable Defender or bypass signature checks. A timeout preserves staging files and may leave extraction running; inspect the reported process before retrying.
+5. After `PayloadReady`, retry Microsoft's Hyper-V installer only after confirming the appliance has not been registered. Confirm installation completes and the page on port `44368` opens. Preserve the remaining error if it still fails; the helper is not proof of full appliance health.
+
+Do not automatically replay the installer on a registered appliance. Microsoft warns that rerunning it can remove/replace its configuration. See [appliance installation and log locations](https://learn.microsoft.com/azure/migrate/deploy-appliance-script). If Gateway setup launches but fails later, inspect the `Gateway` subfolder there, including `MicrosoftAzureGatewayService_*.log` and `GatewayMSIInstall.log` when present. For a later configuration-manager installation failure, retain `ConfigurationManagerInstaller_*.log` from the main log folder.
+
 ## Discovery and replication
 
 The appliance and the host replication provider have different jobs:

@@ -504,5 +504,8 @@ Check 'Installation display preserves progress status warnings and plain logs' {
 Check 'SQL installer identity signature and minimum version are verified before launch' {
     & "$PSScriptRoot/Test-SqlInstaller.ps1"
 }
+Check 'Appliance Gateway extraction waits and verifies fresh payloads from the signed packager' {
+    & "$PSScriptRoot/Test-ApplianceGateway.ps1"
+}
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL $_" }; exit 1 }
 Write-Host "$count local checks passed. Azure/Hyper-V execution has not been tested."

@@ -22,19 +22,29 @@ For this single-host lab, use `HyperVHost\labadmin` (or your chosen host user) w
 2. Connect to `MigrateAppl` through Hyper-V Manager on the host. Sign in as `Administrator` with the lab password.
 3. Verify the guest has eight processors, 16 GB RAM, approximately 100 GB disk capacity, address `192.168.0.20`, gateway `192.168.0.1`, working DNS, internet access and correct time.
 4. Download the current **AzureMigrateInstaller.zip** using the project download option or the link in Microsoft's installation article. Verify it using the article's current integrity instructions.
-5. Extract the installer inside `MigrateAppl`. Open elevated Windows PowerShell, change into the extracted directory, and run:
+5. Extract the **entire ZIP** inside `MigrateAppl`, for example to `C:\AzureMigrateInstaller`. Copy [Expand-LabApplianceGateway.ps1](../scripts/Expand-LabApplianceGateway.ps1) from the reviewed workshop checkout into that folder. Open **64-bit Windows PowerShell 5.1 as administrator** inside `MigrateAppl` and prepare the Gateway payload:
 
 ```powershell
-.\AzureMigrateInstaller.ps1
+Set-Location C:\AzureMigrateInstaller
+.\Expand-LabApplianceGateway.ps1 -InstallerDirectory (Get-Location).Path
 ```
 
-6. Select **Hyper-V**, **Azure public cloud**, and the connectivity option matching this lab. Complete prerequisite checks and updates.
+   Continue only when the helper reports **PayloadReady**. It validates the Microsoft-signed extractor, waits up to ten minutes for extraction, checks its exit code and fresh output files, then verifies the copied payload hashes. It does not install or register the appliance. If it fails, preserve the error and follow [Gateway extraction troubleshooting](Troubleshooting.md#appliance-installer-cannot-find-the-gateway-setup-program).
+6. On this **new, unregistered appliance**, run Microsoft's installer from the same folder:
+
+```powershell
+.\AzureMigrateInstaller.ps1 -Scenario HyperV -Cloud Public -PrivateEndpoint:$false
+```
+
+   These parameters select this lab's Hyper-V/public-cloud/public-endpoint scenario. Review and answer the installer's confirmation and browser prompts. Complete prerequisite checks and updates. If your instructor selected private endpoints, use the matching connectivity setting instead.
+
+The Gateway preparation works around the current Microsoft installer's fixed five-second extraction delay by placing verified payload files beside the installer first. It does not modify Microsoft's script. If the installer still fails, preserve its full error and logs; preparation alone does not establish a successful installation. Do not rerun appliance installation on a registered appliance: it can replace existing configuration. Use the troubleshooting guidance to inspect an earlier failed, unregistered attempt before retrying.
 
 The deployment has already created the appliance's Windows OS VM; do not import a second VHD appliance or run the installer on HyperVHost. Production prerequisites document an external switch. This nested lab uses one NIC with NAT/DHCP for both host reachability and egress; its end-to-end operation must be proven in the instructor rehearsal. [Script-based appliance setup](https://learn.microsoft.com/azure/migrate/deploy-appliance-script)
 
 ## 4. Register and discover
 
-Use the appliance configuration manager shortcut inside `MigrateAppl`, or its documented HTTPS endpoint from the host browser: `https://192.168.0.20:44368`. Verify you are connecting to your own appliance before accepting its initial certificate prompt.
+After appliance installation finishes, use the appliance configuration manager shortcut inside `MigrateAppl`, or its documented HTTPS endpoint from the host browser: `https://192.168.0.20:44368`. Confirm the page opens before beginning registration. Verify you are connecting to your own appliance before accepting its initial certificate prompt.
 
 1. Finish connectivity, time and update checks.
 2. Paste the project key and sign in to the correct Azure tenant/subscription.
