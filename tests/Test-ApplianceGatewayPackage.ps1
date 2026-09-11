@@ -131,6 +131,8 @@ try {
 } catch {
     if ($rootCreated) {
         Write-Warning "Package check failed. Retained files: $testRoot. If extraction started, its process may still be running; inspect it before retrying or removing files."
+        Get-ChildItem -LiteralPath $testRoot -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host ("Extraction evidence: {0} ({1} bytes)" -f $_.FullName.Substring($testRoot.Length), $_.Length) }
     }
     throw
 } finally {
