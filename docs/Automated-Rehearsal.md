@@ -8,6 +8,8 @@ This is a **guided rehearsal with automated checks**, not a fully unattended mig
 
 Microsoft documents interactive appliance configuration/sign-in and a Hyper-V host provider workflow. Its provider installation can also use commands, but project initialization, registration completion and the migration lifecycle have not been implemented or live-tested by this runner. We do not substitute a different migration provider to bypass that work. See [appliance setup](https://learn.microsoft.com/azure/migrate/deploy-appliance-script) and [Hyper-V migration](https://learn.microsoft.com/azure/migrate/tutorial-migrate-hyper-v).
 
+Immediately after `target-networks`, `discovery` pauses for work **inside MigrateAppl**. Source deployment created its Windows VM; the appliance software is not installed automatically. Follow [Module 1](Module-1-Discovery.md) to prepare the Gateway payload, run the interactive Microsoft installer, verify that the configuration page opens, then register and discover. `PayloadReady` means extraction passed, not that installation or discovery completed. The later SQL checkpoint captures baseline data; SQL Server installation already ran during source deployment.
+
 ## First launch
 
 1. Use a complete, reviewed checkout on a persistent Windows workstation with Windows PowerShell 5.1 and the Az modules installed as described in [Module 0](Module-0-Setup.md). If downloading a ZIP, extract the entire archive first. Open the extracted folder containing `Start-Rehearsal.cmd`, `scripts`, `tests`, `docs` and `rehearsal.example.json`; keep that layout together. Keep this workstation available throughout the rehearsal. Python, bash and Node.js are used by the separate development checks/CI; the launcher does not require them.
