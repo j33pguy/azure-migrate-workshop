@@ -80,7 +80,7 @@ function Expand-LabGatewayPayload {
         }
         $payloadNames = @(
             'GATEWAYSETUPINSTALLER.EXE', 'MICROSOFTAZUREGATEWAYSERVICE.MSI',
-            'VCREDIST_X64_2012.EXE', 'VCREDIST_X64_2013.EXE', 'VCREDIST_X64_V14.EXE'
+            'Prereqs/VCREDIST_X64_2012.EXE', 'Prereqs/VCREDIST_X64_2013.EXE', 'Prereqs/VCREDIST_X64_V14.EXE'
         )
         foreach ($name in $payloadNames) {
             $path = Join-Path $staging $name
@@ -97,6 +97,7 @@ function Expand-LabGatewayPayload {
         foreach ($name in $payloadNames) {
             $source = Join-Path $staging $name
             $destination = Join-Path $directoryPath $name
+            $null = New-Item -ItemType Directory -Path (Split-Path -Path $destination -Parent) -Force -ErrorAction Stop
             Copy-Item -LiteralPath $source -Destination $destination -Force -ErrorAction Stop
             if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
                 (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) {

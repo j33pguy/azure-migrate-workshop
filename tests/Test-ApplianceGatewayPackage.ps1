@@ -115,7 +115,7 @@ try {
     }
     foreach ($name in @(
         'GATEWAYSETUPINSTALLER.EXE', 'MICROSOFTAZUREGATEWAYSERVICE.MSI',
-        'VCREDIST_X64_2012.EXE', 'VCREDIST_X64_2013.EXE', 'VCREDIST_X64_V14.EXE'
+        'Prereqs/VCREDIST_X64_2012.EXE', 'Prereqs/VCREDIST_X64_2013.EXE', 'Prereqs/VCREDIST_X64_V14.EXE'
     )) {
         $payloadPath = Join-Path $script:gatewayIntegrationPackageDirectory $name
         if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf) -or (Get-Item -LiteralPath $payloadPath).Length -le 0) {

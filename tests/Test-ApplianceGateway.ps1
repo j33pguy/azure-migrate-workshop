@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $gatewayChecks = 0
 $gatewayPayloadNames = @(
     'GATEWAYSETUPINSTALLER.EXE', 'MICROSOFTAZUREGATEWAYSERVICE.MSI',
-    'VCREDIST_X64_2012.EXE', 'VCREDIST_X64_2013.EXE', 'VCREDIST_X64_V14.EXE'
+    'Prereqs/VCREDIST_X64_2012.EXE', 'Prereqs/VCREDIST_X64_2013.EXE', 'Prereqs/VCREDIST_X64_V14.EXE'
 )
 $tokens = $null
 $parseErrors = $null
@@ -74,6 +74,7 @@ function Start-Process {
     $script:launches += [pscustomobject]@{ FilePath = $FilePath; Arguments = $ArgumentList; Stage = $script:lastStage }
     foreach ($name in $script:extractedNames) {
         $extractedPath = Join-Path $script:lastStage $name
+        $null = New-Item -ItemType Directory -Path (Split-Path -Path $extractedPath -Parent) -Force
         if ($name -eq $script:emptyExtractedName) {
             [IO.File]::WriteAllBytes($extractedPath, [byte[]]@())
         } else {
@@ -181,7 +182,7 @@ try {
         Assert-GatewayFixture (-not (Test-Path -LiteralPath (Join-Path $fixtureDirectory 'GATEWAYSETUPINSTALLER.EXE'))) 'Partial payload was published before all required files were validated.'
     }
     Test-GatewayCase 'missing runtime prerequisites prevent publishing an incomplete payload' {
-        foreach ($runtime in @('VCREDIST_X64_2012.EXE', 'VCREDIST_X64_2013.EXE', 'VCREDIST_X64_V14.EXE')) {
+        foreach ($runtime in @('Prereqs/VCREDIST_X64_2012.EXE', 'Prereqs/VCREDIST_X64_2013.EXE', 'Prereqs/VCREDIST_X64_V14.EXE')) {
             $script:extractedNames = @($gatewayPayloadNames | Where-Object { $_ -ne $runtime })
             $null = Expect-GatewayFailure { Expand-LabGatewayPayload -Directory $fixtureDirectory } ('did not produce ' + [regex]::Escape($runtime))
             Assert-GatewayFixture (-not (Test-Path -LiteralPath (Join-Path $fixtureDirectory 'GATEWAYSETUPINSTALLER.EXE'))) 'A payload missing a runtime prerequisite was published.'
@@ -196,7 +197,14 @@ try {
     Test-GatewayCase 'success copies fresh payloads from a signed wrapper and removes only its own stage' {
         $unrelatedStage = Join-Path $fixtureDirectory 'GatewayPayload-previous-attempt'
         $null = New-Item -ItemType Directory -Path $unrelatedStage
-        foreach ($name in $extractedNames) { Set-Content -LiteralPath (Join-Path $fixtureDirectory $name) -Value 'stale destination' }
+        # Replace stale core files and create the previously absent Prereqs
+        # destination. This catches flattening or failing to create that folder.
+        foreach ($name in @('GATEWAYSETUPINSTALLER.EXE', 'MICROSOFTAZUREGATEWAYSERVICE.MSI')) {
+            $staleDestination = Join-Path $fixtureDirectory $name
+            $null = New-Item -ItemType Directory -Path (Split-Path -Path $staleDestination -Parent) -Force
+            Set-Content -LiteralPath $staleDestination -Value 'stale destination'
+        }
+        Assert-GatewayFixture (-not (Test-Path -LiteralPath (Join-Path $fixtureDirectory 'Prereqs'))) 'The success fixture must begin without a prerequisite destination folder.'
         $result = @(Expand-LabGatewayPayload -Directory $fixtureDirectory)
         Assert-GatewayFixture ($result.Count -eq 1 -and $result[0].Status -eq 'PayloadReady') 'Success did not return exactly one PayloadReady result.'
         Assert-GatewayFixture ($result[0].InstallerDirectory -eq $fixtureDirectory -and $result[0].GatewaySetup -eq (Join-Path $fixtureDirectory 'GATEWAYSETUPINSTALLER.EXE')) 'Success returned an incorrect package path.'
